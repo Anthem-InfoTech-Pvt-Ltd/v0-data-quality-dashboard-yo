@@ -2,17 +2,23 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useEffect, useState } from "react"
 
 export function HealthScoreTrendChart() {
-  const data = [
-    { day: "Mon", score: 72 },
-    { day: "Tue", score: 75 },
-    { day: "Wed", score: 71 },
-    { day: "Thu", score: 78 },
-    { day: "Fri", score: 76 },
-    { day: "Sat", score: 79 },
-    { day: "Sun", score: 74 },
-  ]
+  const [data, setData] = useState<{ day: string; score: number }[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/charts/health-score-trend")
+        const chartData = await res.json()
+        setData(chartData)
+      } catch (error) {
+        console.error("Error fetching health score trend:", error)
+      }
+    }
+    fetchData()
+  }, [])
 
   return (
     <Card>

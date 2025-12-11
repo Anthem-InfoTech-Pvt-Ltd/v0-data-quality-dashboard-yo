@@ -2,15 +2,23 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useEffect, useState } from "react"
 
 export function IssuesByIndustryChart() {
-  const data = [
-    { industry: "Technology", issues: 8 },
-    { industry: "Finance", issues: 6 },
-    { industry: "Healthcare", issues: 7 },
-    { industry: "Retail", issues: 4 },
-    { industry: "Manufacturing", issues: 5 },
-  ]
+  const [data, setData] = useState<{ industry: string; issues: number }[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/charts/issues-by-industry")
+        const chartData = await res.json()
+        setData(chartData)
+      } catch (error) {
+        console.error("Error fetching issues by industry:", error)
+      }
+    }
+    fetchData()
+  }, [])
 
   return (
     <Card>

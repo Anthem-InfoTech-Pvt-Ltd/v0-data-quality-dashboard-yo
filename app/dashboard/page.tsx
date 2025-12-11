@@ -7,9 +7,8 @@ import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { HealthScoreCircle } from "@/components/health-score-circle"
-import { calculateHealthScore, metrics, overdueLeads } from "@/lib/demo-data"
 import { useToast } from "@/hooks/use-toast"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { DataQualityPieChart } from "@/components/charts/data-quality-pie"
 import { HealthScoreTrendChart } from "@/components/charts/health-score-trend"
@@ -18,42 +17,198 @@ import { WeeklyActivityChart } from "@/components/charts/weekly-activity"
 import { useRouter } from "next/navigation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
+interface Metrics {
+  duplicates: number
+  unassignedLeads: number
+  missingFields: number
+  totalContacts: number
+  overdueLeads: number
+}
+
+interface OverdueLead {
+  _id: string
+  fullName: string
+  company: string
+  createdDate: string
+  daysOverdue: number
+}
+
 export default function DashboardPage() {
-  const healthScore = calculateHealthScore()
   const { toast } = useToast()
   const router = useRouter()
+  const [healthScore, setHealthScore] = useState(0)
+  const [metrics, setMetrics] = useState<Metrics>({
+    duplicates: 0,
+    unassignedLeads: 0,
+    missingFields: 0,
+    totalContacts: 0,
+    overdueLeads: 0,
+  })
+  const [overdueLeads, setOverdueLeads] = useState<OverdueLead[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isDedupeLoading, setIsDedupeLoading] = useState(false)
   const [isReassignLoading, setIsReassignLoading] = useState(false)
   const [emailAlertLoading, setEmailAlertLoading] = useState<string | null>(null)
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [metricsRes, healthScoreRes, overdueLeadsRes] = await Promise.all([
+          fetch("/api/metrics"),
+          fetch("/api/health-score"),
+          fetch("/api/leads/overdue"),
+        ])
+
+        const metricsData = await metricsRes.json()
+        const healthScoreData = await healthScoreRes.json()
+        const overdueLeadsData = await overdueLeadsRes.json()
+
+        setMetrics(metricsData)
+        setHealthScore(healthScoreData.score)
+        setOverdueLeads(overdueLeadsData)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [toast])
+
   const handleRunDedupe = async () => {
     setIsDedupeLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsDedupeLoading(false)
-    toast({
-      title: "Deduplication Complete",
-      description: "Successfully identified and merged duplicate records.",
-    })
+    try {
+      // Get duplicate contacts
+      const contactsRes = await fetch("/api/contacts")
+      const contacts = await contactsRes.json()
+      const duplicateIds = contacts.filter((c: any) => c.isDuplicate).map((c: any) => c._id)
+
+      if (duplicateIds.length < 2) {
+        toast({
+          title: "No Duplicates",
+          description: "No duplicate records found to merge.",
+        })
+        setIsDedupeLoading(false)
+        return
+      }
+
+      // Merge duplicates
+      await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "merge", ids: duplicateIds }),
+      })
+
+      // Refresh data
+      const [metricsRes, healthScoreRes] = await Promise.all([
+        fetch("/api/metrics"),
+        fetch("/api/health-score"),
+      ])
+      setMetrics(await metricsRes.json())
+      setHealthScore((await healthScoreRes.json()).score)
+
+      toast({
+        title: "Deduplication Complete",
+        description: "Successfully identified and merged duplicate records.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to run deduplication",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDedupeLoading(false)
+    }
   }
 
   const handleReassignLeads = async () => {
     setIsReassignLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsReassignLoading(false)
-    toast({
-      title: "Leads Reassigned",
-      description: "Successfully reassigned unassigned leads to sales team.",
-    })
+    try {
+      // Get unassigned contacts
+      const contactsRes = await fetch("/api/contacts")
+      const contacts = await contactsRes.json()
+      const unassignedIds = contacts.filter((c: any) => !c.isAssigned).map((c: any) => c._id)
+
+      if (unassignedIds.length === 0) {
+        toast({
+          title: "No Unassigned Leads",
+          description: "All leads are already assigned.",
+        })
+        setIsReassignLoading(false)
+        return
+      }
+
+      // Assign leads
+      await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "assign", ids: unassignedIds }),
+      })
+
+      // Refresh data
+      const [metricsRes, healthScoreRes] = await Promise.all([
+        fetch("/api/metrics"),
+        fetch("/api/health-score"),
+      ])
+      setMetrics(await metricsRes.json())
+      setHealthScore((await healthScoreRes.json()).score)
+
+      toast({
+        title: "Leads Reassigned",
+        description: "Successfully reassigned unassigned leads to sales team.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reassign leads",
+        variant: "destructive",
+      })
+    } finally {
+      setIsReassignLoading(false)
+    }
   }
 
   const handleSendEmailAlert = async (leadId: string, leadName: string) => {
     setEmailAlertLoading(leadId)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setEmailAlertLoading(null)
-    toast({
-      title: "Email Alert Sent",
-      description: `Assignment reminder sent for ${leadName}`,
-    })
+    try {
+      await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send-alert", leadId }),
+      })
+      toast({
+        title: "Email Alert Sent",
+        description: `Assignment reminder sent for ${leadName}`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send email alert",
+        variant: "destructive",
+      })
+    } finally {
+      setEmailAlertLoading(null)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <Header />
+          <main className="container px-4 py-8 max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </main>
+        </div>
+      </ProtectedRoute>
+    )
   }
 
   return (
@@ -270,10 +425,10 @@ export default function DashboardPage() {
                     </TableHeader>
                     <TableBody>
                       {overdueLeads.map((lead) => (
-                        <TableRow key={lead.id}>
+                        <TableRow key={lead._id}>
                           <TableCell className="font-medium">{lead.fullName}</TableCell>
                           <TableCell>{lead.company}</TableCell>
-                          <TableCell>{lead.createdDate.toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(lead.createdDate).toLocaleDateString()}</TableCell>
                           <TableCell className="text-center">
                             <Badge
                               variant={lead.daysOverdue >= 5 ? "destructive" : "outline"}
@@ -291,11 +446,11 @@ export default function DashboardPage() {
                               size="sm"
                               variant="outline"
                               className="gap-2 bg-transparent"
-                              onClick={() => handleSendEmailAlert(lead.id, lead.fullName)}
-                              disabled={emailAlertLoading === lead.id}
+                              onClick={() => handleSendEmailAlert(lead._id, lead.fullName)}
+                              disabled={emailAlertLoading === lead._id}
                             >
                               <Mail className="w-4 h-4" />
-                              {emailAlertLoading === lead.id ? "Sending..." : "Send Email Alert"}
+                              {emailAlertLoading === lead._id ? "Sending..." : "Send Email Alert"}
                             </Button>
                           </TableCell>
                         </TableRow>

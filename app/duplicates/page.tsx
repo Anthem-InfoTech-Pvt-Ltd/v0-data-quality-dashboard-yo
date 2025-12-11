@@ -8,18 +8,47 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { contacts } from "@/lib/demo-data"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
+
+interface Contact {
+  _id: string
+  name: string
+  email: string
+  company: string
+  isAssigned: boolean
+  hasMissingFields: boolean
+  isDuplicate: boolean
+}
 
 export default function DuplicatesPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [selectedRecords, setSelectedRecords] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [duplicateRecords, setDuplicateRecords] = useState<Contact[]>([])
+  const [isFetching, setIsFetching] = useState(true)
 
-  const duplicateRecords = contacts.filter((c) => c.isDuplicate)
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const res = await fetch("/api/contacts")
+        const contacts = await res.json()
+        setDuplicateRecords(contacts.filter((c: Contact) => c.isDuplicate))
+      } catch (error) {
+        console.error("Error fetching contacts:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load duplicate records",
+          variant: "destructive",
+        })
+      } finally {
+        setIsFetching(false)
+      }
+    }
+    fetchContacts()
+  }, [toast])
 
   const handleSelectAll = () => {
     if (selectedRecords.length === duplicateRecords.length) {
@@ -44,15 +73,50 @@ export default function DuplicatesPage() {
     }
 
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    try {
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "merge", ids: selectedRecords }),
+      })
 
-    toast({
-      title: "Duplicates Merged",
-      description: `Successfully merged ${selectedRecords.length} duplicate records.`,
-    })
+      if (!res.ok) {
+        throw new Error("Failed to merge duplicates")
+      }
 
-    setSelectedRecords([])
+      // Refresh contacts
+      const contactsRes = await fetch("/api/contacts")
+      const contacts = await contactsRes.json()
+      setDuplicateRecords(contacts.filter((c: Contact) => c.isDuplicate))
+
+      toast({
+        title: "Duplicates Merged",
+        description: `Successfully merged ${selectedRecords.length} duplicate records.`,
+      })
+
+      setSelectedRecords([])
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to merge duplicates",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isFetching) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+          <Header />
+          <main className="container px-4 py-8 max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </main>
+        </div>
+      </ProtectedRoute>
+    )
   }
 
   return (
@@ -118,8 +182,8 @@ export default function DuplicatesPage() {
                       className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <Checkbox
-                        checked={selectedRecords.includes(record.id)}
-                        onCheckedChange={() => handleSelectRecord(record.id)}
+                        checked={selectedRecords.includes(record._id)}
+                        onCheckedChange={() => handleSelectRecord(record._id)}
                       />
                       <div className="flex-1 grid sm:grid-cols-3 gap-4">
                         <div>

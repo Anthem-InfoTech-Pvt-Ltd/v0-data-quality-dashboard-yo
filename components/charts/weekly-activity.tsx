@@ -2,17 +2,23 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useEffect, useState } from "react"
 
 export function WeeklyActivityChart() {
-  const data = [
-    { day: "Mon", resolved: 12, detected: 18 },
-    { day: "Tue", resolved: 15, detected: 21 },
-    { day: "Wed", resolved: 18, detected: 16 },
-    { day: "Thu", resolved: 14, detected: 19 },
-    { day: "Fri", resolved: 20, detected: 22 },
-    { day: "Sat", resolved: 8, detected: 10 },
-    { day: "Sun", resolved: 6, detected: 8 },
-  ]
+  const [data, setData] = useState<{ day: string; resolved: number; detected: number }[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/charts/weekly-activity")
+        const chartData = await res.json()
+        setData(chartData)
+      } catch (error) {
+        console.error("Error fetching weekly activity:", error)
+      }
+    }
+    fetchData()
+  }, [])
 
   return (
     <Card>

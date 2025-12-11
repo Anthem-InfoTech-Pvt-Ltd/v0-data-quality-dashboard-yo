@@ -2,9 +2,38 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
-import { metrics } from "@/lib/demo-data"
+import { useEffect, useState } from "react"
+
+interface Metrics {
+  duplicates: number
+  unassignedLeads: number
+  missingFields: number
+  totalContacts: number
+  overdueLeads: number
+}
 
 export function DataQualityPieChart() {
+  const [metrics, setMetrics] = useState<Metrics>({
+    duplicates: 0,
+    unassignedLeads: 0,
+    missingFields: 0,
+    totalContacts: 0,
+    overdueLeads: 0,
+  })
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const res = await fetch("/api/metrics")
+        const data = await res.json()
+        setMetrics(data)
+      } catch (error) {
+        console.error("Error fetching metrics:", error)
+      }
+    }
+    fetchMetrics()
+  }, [])
+
   const data = [
     {
       name: "Healthy Records",
