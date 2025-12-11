@@ -16,12 +16,14 @@ const missingFieldTypes = ["Phone Number", "Job Title", "Address", "Revenue", "I
 
 interface Contact {
   _id: string
-  name: string
   email: string
+  first_name: string
+  last_name: string
   company: string
-  isAssigned: boolean
-  hasMissingFields: boolean
-  isDuplicate: boolean
+  industry: string | null
+  owner_id: string | null
+  owner_name: string | null
+  created_date: string
 }
 
 export default function MissingFieldsPage() {
@@ -35,9 +37,9 @@ export default function MissingFieldsPage() {
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const res = await fetch("/api/contacts")
-        const contacts = await res.json()
-        setMissingFieldRecords(contacts.filter((c: Contact) => c.hasMissingFields))
+        const res = await fetch("/api/contacts/missing-fields")
+        const missingFields = await res.json()
+        setMissingFieldRecords(missingFields)
       } catch (error) {
         console.error("Error fetching contacts:", error)
         toast({
@@ -87,9 +89,9 @@ export default function MissingFieldsPage() {
       }
 
       // Refresh contacts
-      const contactsRes = await fetch("/api/contacts")
-      const contacts = await contactsRes.json()
-      setMissingFieldRecords(contacts.filter((c: Contact) => c.hasMissingFields))
+      const contactsRes = await fetch("/api/contacts/missing-fields")
+      const missingFields = await contactsRes.json()
+      setMissingFieldRecords(missingFields)
 
       toast({
         title: "Fields Updated",
@@ -193,7 +195,7 @@ export default function MissingFieldsPage() {
                       />
                       <div className="flex-1 grid sm:grid-cols-3 gap-4">
                         <div>
-                          <p className="font-medium">{record.name}</p>
+                          <p className="font-medium">{record.first_name} {record.last_name}</p>
                           <p className="text-sm text-muted-foreground">{record.email}</p>
                         </div>
                         <div>
@@ -205,9 +207,9 @@ export default function MissingFieldsPage() {
                             variant="outline"
                             className="bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-300"
                           >
-                            Missing: {getMissingFieldForRecord(index)}
+                            Missing: Industry
                           </Badge>
-                          {record.isDuplicate && <Badge variant="destructive">Duplicate</Badge>}
+                          {!record.owner_id && <Badge variant="outline">Unassigned</Badge>}
                         </div>
                       </div>
                     </motion.div>

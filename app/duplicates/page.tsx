@@ -14,12 +14,14 @@ import { useToast } from "@/hooks/use-toast"
 
 interface Contact {
   _id: string
-  name: string
   email: string
+  first_name: string
+  last_name: string
   company: string
-  isAssigned: boolean
-  hasMissingFields: boolean
-  isDuplicate: boolean
+  industry: string | null
+  owner_id: string | null
+  owner_name: string | null
+  created_date: string
 }
 
 export default function DuplicatesPage() {
@@ -33,9 +35,9 @@ export default function DuplicatesPage() {
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const res = await fetch("/api/contacts")
-        const contacts = await res.json()
-        setDuplicateRecords(contacts.filter((c: Contact) => c.isDuplicate))
+        const res = await fetch("/api/contacts/duplicates")
+        const duplicates = await res.json()
+        setDuplicateRecords(duplicates)
       } catch (error) {
         console.error("Error fetching contacts:", error)
         toast({
@@ -85,9 +87,9 @@ export default function DuplicatesPage() {
       }
 
       // Refresh contacts
-      const contactsRes = await fetch("/api/contacts")
-      const contacts = await contactsRes.json()
-      setDuplicateRecords(contacts.filter((c: Contact) => c.isDuplicate))
+      const contactsRes = await fetch("/api/contacts/duplicates")
+      const duplicates = await contactsRes.json()
+      setDuplicateRecords(duplicates)
 
       toast({
         title: "Duplicates Merged",
@@ -187,7 +189,7 @@ export default function DuplicatesPage() {
                       />
                       <div className="flex-1 grid sm:grid-cols-3 gap-4">
                         <div>
-                          <p className="font-medium">{record.name}</p>
+                          <p className="font-medium">{record.first_name} {record.last_name}</p>
                           <p className="text-sm text-muted-foreground">{record.email}</p>
                         </div>
                         <div>
@@ -196,7 +198,7 @@ export default function DuplicatesPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="destructive">Duplicate</Badge>
-                          <Badge variant="outline">{record.isAssigned ? "Assigned" : "Unassigned"}</Badge>
+                          <Badge variant="outline">{record.owner_id ? "Assigned" : "Unassigned"}</Badge>
                         </div>
                       </div>
                     </motion.div>

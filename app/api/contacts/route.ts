@@ -24,28 +24,49 @@ export async function POST(request: Request) {
       // Merge duplicates - keep first, delete others
       const [keepId, ...deleteIds] = ids
       await db.collection("contacts").deleteMany({ _id: { $in: deleteIds.map((id: string) => new ObjectId(id)) } })
-      await db.collection("contacts").updateOne(
-        { _id: new ObjectId(keepId) },
-        { $set: { isDuplicate: false } }
-      )
       return NextResponse.json({ success: true, message: `Merged ${ids.length} duplicate records` })
     }
 
     if (action === "assign" && Array.isArray(ids) && ids.length > 0) {
-      // Assign leads
-      await db.collection("contacts").updateMany(
-        { _id: { $in: ids.map((id: string) => new ObjectId(id)) } },
-        { $set: { isAssigned: true } }
-      )
+      // Assign leads - assign to a random sales owner
+      const salesOwners = [
+        { id: "owner-1", name: "Alex Thompson" },
+        { id: "owner-2", name: "Maria Garcia" },
+        { id: "owner-3", name: "David Chen" },
+        { id: "owner-4", name: "Sarah Johnson" },
+        { id: "owner-5", name: "Michael Brown" },
+      ]
+      
+      // Assign each contact to a random owner
+      for (const id of ids) {
+        const owner = salesOwners[Math.floor(Math.random() * salesOwners.length)]
+        await db.collection("contacts").updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { owner_id: owner.id, owner_name: owner.name } }
+        )
+      }
+      
       return NextResponse.json({ success: true, message: `Assigned ${ids.length} leads` })
     }
 
     if (action === "update" && Array.isArray(ids) && ids.length > 0) {
-      // Update missing fields
-      await db.collection("contacts").updateMany(
-        { _id: { $in: ids.map((id: string) => new ObjectId(id)) } },
-        { $set: { hasMissingFields: false } }
-      )
+      // Update missing fields - assign industry from company
+      const contacts = await db.collection("contacts").find({ _id: { $in: ids.map((id: string) => new ObjectId(id)) } }).toArray()
+      const companies = await db.collection("companies").find({}).toArray()
+      const companyIndustryMap = new Map<string, string | null>()
+      
+      companies.forEach((company: any) => {
+        companyIndustryMap.set(company.name, company.industry)
+      })
+      
+      for (const contact of contacts) {
+        const industry = companyIndustryMap.get(contact.company) || "Technology" // Default fallback
+        await db.collection("contacts").updateOne(
+          { _id: contact._id },
+          { $set: { industry } }
+        )
+      }
+      
       return NextResponse.json({ success: true, message: `Updated ${ids.length} records` })
     }
 
@@ -55,4 +76,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 })
   }
 }
-

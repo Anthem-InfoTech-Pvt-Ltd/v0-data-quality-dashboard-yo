@@ -12,32 +12,26 @@ if (!uri) {
   process.exit(1)
 }
 
-const companies = [
-  { name: "Acme Corp", industry: "Technology", hasIssues: true },
-  { name: "TechStart Inc", industry: "Technology", hasIssues: false },
-  { name: "Finance Pro", industry: "Finance", hasIssues: true },
-  { name: "HealthCare Plus", industry: "Healthcare", hasIssues: true },
-  { name: "Retail Giants", industry: "Retail", hasIssues: false },
-  { name: "ManufactureCo", industry: "Manufacturing", hasIssues: true },
-  { name: "BankSecure", industry: "Finance", hasIssues: false },
-  { name: "MediCare Systems", industry: "Healthcare", hasIssues: true },
-  { name: "CloudTech", industry: "Technology", hasIssues: false },
-  { name: "DataFlow Inc", industry: "Technology", hasIssues: true },
-  { name: "RetailMax", industry: "Retail", hasIssues: false },
-  { name: "FactoryPro", industry: "Manufacturing", hasIssues: true },
-  { name: "InvestSmart", industry: "Finance", hasIssues: false },
-  { name: "HealthFirst", industry: "Healthcare", hasIssues: true },
-  { name: "TechInnovate", industry: "Technology", hasIssues: false },
-  { name: "ShopEasy", industry: "Retail", hasIssues: true },
-  { name: "BuildRight", industry: "Manufacturing", hasIssues: false },
-  { name: "CapitalGrowth", industry: "Finance", hasIssues: true },
-  { name: "WellnessCare", industry: "Healthcare", hasIssues: false },
-  { name: "DevOps Solutions", industry: "Technology", hasIssues: true },
-  { name: "Market Leaders", industry: "Retail", hasIssues: false },
-  { name: "Industrial Pro", industry: "Manufacturing", hasIssues: true },
-  { name: "WealthManage", industry: "Finance", hasIssues: false },
-  { name: "PharmaCare", industry: "Healthcare", hasIssues: true },
-  { name: "SaaS Pioneers", industry: "Technology", hasIssues: false },
+// Realistic B2B company names
+const companyNames = [
+  "Acme Corporation", "TechStart Solutions", "Finance Pro Group", "HealthCare Plus", "Retail Giants Inc",
+  "ManufactureCo Industries", "BankSecure Financial", "MediCare Systems", "CloudTech Innovations", "DataFlow Inc",
+  "RetailMax Enterprises", "FactoryPro Manufacturing", "InvestSmart Capital", "HealthFirst Medical", "TechInnovate Labs",
+  "ShopEasy Commerce", "BuildRight Construction", "CapitalGrowth Partners", "WellnessCare Health", "DevOps Solutions",
+  "Market Leaders Corp", "Industrial Pro Systems", "WealthManage Advisors", "PharmaCare Pharmaceuticals", "SaaS Pioneers",
+  "Enterprise Solutions", "Global Tech Partners", "Strategic Business Group"
+]
+
+const industries = ["Technology", "Finance", "Healthcare", "Retail", "Manufacturing", "Consulting", "Real Estate", "Education"]
+const firstNames = ["John", "Sarah", "Michael", "Emily", "David", "Jennifer", "Robert", "Jessica", "William", "Amanda", "James", "Lisa", "Richard", "Michelle", "Joseph", "Ashley", "Thomas", "Melissa", "Charles", "Nicole"]
+const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee"]
+
+const salesOwners = [
+  { id: "owner-1", name: "Alex Thompson" },
+  { id: "owner-2", name: "Maria Garcia" },
+  { id: "owner-3", name: "David Chen" },
+  { id: "owner-4", name: "Sarah Johnson" },
+  { id: "owner-5", name: "Michael Brown" },
 ]
 
 async function seed() {
@@ -45,13 +39,12 @@ async function seed() {
 
   try {
     console.log("Connecting to MongoDB...")
-    console.log("URI:", uri.replace(/\/\/.*@/, "//***:***@")) // Hide credentials in logs
+    console.log("URI:", uri.replace(/\/\/.*@/, "//***:***@"))
     
     client = new MongoClient(uri)
     await client.connect()
     console.log("✓ Connected to MongoDB")
 
-    // Extract database name from URI or use default
     let dbName = "dataqualitydashboard"
     if (uri.includes("/")) {
       const uriParts = uri.split("/")
@@ -71,75 +64,160 @@ async function seed() {
     await db.collection("leads").deleteMany({})
     console.log("✓ Cleared existing collections")
 
-    // Insert companies (MongoDB will auto-generate unique ObjectIds)
-    console.log("Inserting companies...")
-    const insertedCompanies = await db.collection("companies").insertMany(companies)
+    // Generate 20-30 companies
+    const numCompanies = Math.floor(Math.random() * 11) + 20 // 20-30
+    console.log(`Generating ${numCompanies} companies...`)
+    console.log(`Available company names: ${companyNames.length}`)
+    
+    const companies = []
+    for (let i = 0; i < numCompanies; i++) {
+      const industry = Math.random() > 0.2 ? industries[i % industries.length] : null // 80% have industry
+      const employeeCount = Math.random() > 0.3 ? Math.floor(Math.random() * 5000) + 50 : null // 70% have employee count
+      
+      const companyIndex = i % companyNames.length // Wrap around if needed
+      const companyName = companyNames[companyIndex]
+      
+      if (!companyName) {
+        console.error(`Error: companyName is undefined at index ${companyIndex}`)
+        throw new Error(`Invalid company name at index ${companyIndex}`)
+      }
+      
+      companies.push({
+        name: companyName,
+        website: `https://www.${companyName.toLowerCase().replace(/\s+/g, "")}.com`,
+        industry,
+        employee_count: employeeCount,
+      })
+    }
+
+    await db.collection("companies").insertMany(companies)
     console.log(`✓ Inserted ${companies.length} companies with unique ObjectIds`)
 
-    // Generate contacts (MongoDB will auto-generate unique ObjectIds)
-    console.log("Generating contacts...")
+    // Generate 80-100 contacts
+    const numContacts = Math.floor(Math.random() * 21) + 80 // 80-100
+    console.log(`Generating ${numContacts} contacts...`)
+    
     const contacts = []
-    for (let i = 0; i < 90; i++) {
-      const company = companies[i % companies.length]
-      const isDuplicate = i < 15
-      const isUnassigned = i >= 15 && i < 35
-      const hasMissingFields = i >= 35 && i < 60
-
+    const emailMap = new Map<string, number>() // Track emails for duplicates
+    const duplicateEmails: string[] = [] // Store emails to duplicate
+    
+    // First pass: create unique contacts
+    for (let i = 0; i < numContacts; i++) {
+      const companyIndex = i % companies.length
+      const company = companies[companyIndex]
+      
+      if (!company || !company.name) {
+        console.error(`Error: Invalid company at index ${companyIndex}`)
+        throw new Error(`Invalid company at index ${companyIndex}`)
+      }
+      
+      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)]
+      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
+      const baseEmail = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${company.name.toLowerCase().replace(/\s+/g, "")}.com`
+      
+      // Determine if this will be a duplicate (25% duplicates)
+      const willBeDuplicate = i < Math.floor(numContacts * 0.25)
+      
+      let email = baseEmail
+      if (emailMap.has(baseEmail)) {
+        emailMap.set(baseEmail, emailMap.get(baseEmail)! + 1)
+        email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${emailMap.get(baseEmail)}@${company.name.toLowerCase().replace(/\s+/g, "")}.com`
+      } else {
+        emailMap.set(baseEmail, 1)
+      }
+      
+      if (willBeDuplicate) {
+        duplicateEmails.push(email)
+      }
+      
+      // 30% unassigned (owner_id = null)
+      const isUnassigned = i < Math.floor(numContacts * 0.30)
+      // 25% missing industry
+      const hasMissingIndustry = i >= Math.floor(numContacts * 0.30) && i < Math.floor(numContacts * 0.55)
+      
+      const owner = isUnassigned ? null : salesOwners[Math.floor(Math.random() * salesOwners.length)]
+      
       contacts.push({
-        name: `Contact ${i + 1}`,
-        email: `contact${i + 1}@${company.name.toLowerCase().replace(/\s+/g, "")}.com`,
+        email,
+        first_name: firstName,
+        last_name: lastName,
         company: company.name,
-        isAssigned: !isUnassigned,
-        hasMissingFields,
-        isDuplicate,
+        industry: hasMissingIndustry ? null : company.industry,
+        owner_id: owner ? owner.id : null,
+        owner_name: owner ? owner.name : null,
+        created_date: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000), // Random date within last 90 days
       })
+    }
+    
+    // Second pass: create duplicate variations (25% duplicates)
+    const duplicateCount = Math.floor(numContacts * 0.25)
+    for (let i = 0; i < duplicateCount && duplicateEmails.length > 0; i++) {
+      const originalEmail = duplicateEmails[i % duplicateEmails.length]
+      const originalContact = contacts.find(c => c.email === originalEmail)
+      if (originalContact) {
+        // Create variations: different email format, slight name variation
+        const variations = [
+          { email: originalEmail.replace("@", "+1@"), first_name: originalContact.first_name, last_name: originalContact.last_name },
+          { email: originalEmail.replace(".", "_"), first_name: originalContact.first_name, last_name: originalContact.last_name + " Jr" },
+          { email: originalEmail.replace(originalContact.first_name.toLowerCase(), originalContact.first_name.toLowerCase().charAt(0)), first_name: originalContact.first_name, last_name: originalContact.last_name },
+        ]
+        const variation = variations[i % variations.length]
+        
+        contacts.push({
+          email: variation.email,
+          first_name: variation.first_name,
+          last_name: variation.last_name,
+          company: originalContact.company,
+          industry: originalContact.industry,
+          owner_id: originalContact.owner_id,
+          owner_name: originalContact.owner_name,
+          created_date: new Date(originalContact.created_date.getTime() + Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000), // Within 7 days of original
+        })
+      }
     }
 
     await db.collection("contacts").insertMany(contacts)
     console.log(`✓ Inserted ${contacts.length} contacts with unique ObjectIds`)
+    console.log(`  - Duplicates: ~${duplicateCount} (email/name variations)`)
+    console.log(`  - Unassigned: ~${Math.floor(numContacts * 0.30)} (owner_id = null)`)
+    console.log(`  - Missing Industry: ~${Math.floor(numContacts * 0.25)} (industry = null)`)
+
+    // Generate leads (unassigned contacts >24h old)
+    const unassignedContacts = contacts.filter(c => !c.owner_id)
+    const overdueLeads = unassignedContacts
+      .filter(c => {
+        const daysSinceCreation = Math.floor((Date.now() - c.created_date.getTime()) / (24 * 60 * 60 * 1000))
+        return daysSinceCreation > 1 // >24 hours
+      })
+      .slice(0, 10) // Limit to 10 for demo
+      .map(c => ({
+        fullName: `${c.first_name} ${c.last_name}`,
+        company: c.company,
+        createdDate: c.created_date,
+        daysOverdue: Math.floor((Date.now() - c.created_date.getTime()) / (24 * 60 * 60 * 1000)) - 1,
+      }))
+
+    await db.collection("leads").insertMany(overdueLeads)
+    console.log(`✓ Inserted ${overdueLeads.length} overdue leads`)
 
     // Insert alerts
     const alerts = [
       {
         type: "duplicate",
-        message: "3 duplicate contacts found in Acme Corp",
+        message: "Duplicate contacts detected with similar email addresses",
         timestamp: new Date(Date.now() - 1000 * 60 * 5),
         severity: "high",
       },
       {
         type: "unassigned",
-        message: "5 leads from TechStart Inc are unassigned",
+        message: "Multiple leads are unassigned and require attention",
         timestamp: new Date(Date.now() - 1000 * 60 * 15),
         severity: "medium",
       },
       {
         type: "missing-field",
-        message: "Finance Pro contact missing phone numbers",
+        message: "Contacts missing industry classification",
         timestamp: new Date(Date.now() - 1000 * 60 * 30),
-        severity: "medium",
-      },
-      {
-        type: "duplicate",
-        message: "Duplicate email detected for HealthCare Plus",
-        timestamp: new Date(Date.now() - 1000 * 60 * 45),
-        severity: "high",
-      },
-      {
-        type: "unassigned",
-        message: "8 new leads awaiting assignment",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60),
-        severity: "low",
-      },
-      {
-        type: "missing-field",
-        message: "ManufactureCo deals missing revenue data",
-        timestamp: new Date(Date.now() - 1000 * 60 * 90),
-        severity: "high",
-      },
-      {
-        type: "duplicate",
-        message: "2 duplicate companies found in system",
-        timestamp: new Date(Date.now() - 1000 * 60 * 120),
         severity: "medium",
       },
     ]
@@ -148,113 +226,27 @@ async function seed() {
     await db.collection("alerts").insertMany(alerts)
     console.log(`✓ Inserted ${alerts.length} alerts with unique ObjectIds`)
 
-    // Insert email alerts
-    const emailAlerts = [
-      {
-        subject: "New Lead Assignment Required - Acme Corp",
-        from: "leads@crm.com",
-        preview: "5 new leads from Acme Corp require immediate assignment to sales team members...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 10),
-        isRead: false,
-        priority: "high",
-      },
-      {
-        subject: "Data Quality Report - Weekly Summary",
-        from: "reports@crm.com",
-        preview: "Your weekly data quality report is ready. Overall health score improved by 5%...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 45),
-        isRead: true,
-        priority: "normal",
-      },
-      {
-        subject: "Duplicate Records Detected - TechStart Inc",
-        from: "alerts@crm.com",
-        preview: "3 duplicate contact records found in TechStart Inc. Review and merge recommended...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 90),
-        isRead: false,
-        priority: "high",
-      },
-      {
-        subject: "Missing Contact Information Alert",
-        from: "alerts@crm.com",
-        preview: "15 contacts are missing phone numbers. Complete data entry to improve quality...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 120),
-        isRead: true,
-        priority: "normal",
-      },
-      {
-        subject: "Unassigned Leads Reminder",
-        from: "leads@crm.com",
-        preview: "You have 20 unassigned leads waiting for distribution. Assign now to prevent delays...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 180),
-        isRead: false,
-        priority: "high",
-      },
-      {
-        subject: "Monthly Data Health Insights",
-        from: "reports@crm.com",
-        preview: "Your monthly data health insights are available. Check out top performing teams...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 240),
-        isRead: true,
-        priority: "low",
-      },
-    ]
+    // Insert email alerts for unassigned leads >24h
+    const emailAlerts = overdueLeads.slice(0, 5).map((lead, index) => ({
+      subject: `Unassigned Lead Alert: ${lead.fullName} - ${lead.company}`,
+      from: "alerts@revenuehealth.com",
+      preview: `Lead ${lead.fullName} from ${lead.company} has been unassigned for ${lead.daysOverdue} days. Please assign to a sales representative...`,
+      timestamp: new Date(Date.now() - 1000 * 60 * (10 + index * 5)),
+      isRead: index < 2, // First 2 are read
+      priority: lead.daysOverdue >= 5 ? "high" : "normal",
+    }))
 
     console.log("Inserting email alerts...")
     await db.collection("emailAlerts").insertMany(emailAlerts)
     console.log(`✓ Inserted ${emailAlerts.length} email alerts with unique ObjectIds`)
 
-    // Insert leads
-    const leads = [
-      {
-        fullName: "Sarah Johnson",
-        company: "Acme Corp",
-        createdDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
-        daysOverdue: 3,
-      },
-      {
-        fullName: "Michael Chen",
-        company: "TechStart Inc",
-        createdDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
-        daysOverdue: 5,
-      },
-      {
-        fullName: "Emily Rodriguez",
-        company: "Finance Pro",
-        createdDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
-        daysOverdue: 2,
-      },
-      {
-        fullName: "David Thompson",
-        company: "HealthCare Plus",
-        createdDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7),
-        daysOverdue: 7,
-      },
-      {
-        fullName: "Jennifer Lee",
-        company: "CloudTech",
-        createdDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4),
-        daysOverdue: 4,
-      },
-      {
-        fullName: "Robert Martinez",
-        company: "DataFlow Inc",
-        createdDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6),
-        daysOverdue: 6,
-      },
-    ]
-
-    console.log("Inserting leads...")
-    await db.collection("leads").insertMany(leads)
-    console.log(`✓ Inserted ${leads.length} leads with unique ObjectIds`)
-
     console.log("\n✅ Seed completed successfully!")
     console.log("\nSummary:")
     console.log(`  - Companies: ${companies.length}`)
     console.log(`  - Contacts: ${contacts.length}`)
+    console.log(`  - Overdue Leads: ${overdueLeads.length}`)
     console.log(`  - Alerts: ${alerts.length}`)
     console.log(`  - Email Alerts: ${emailAlerts.length}`)
-    console.log(`  - Leads: ${leads.length}`)
     console.log("\nAll documents have been assigned unique MongoDB ObjectIds.")
   } catch (error) {
     console.error("\n❌ Error seeding database:", error)
@@ -280,4 +272,3 @@ seed()
     console.error("Seeding failed:", error)
     process.exit(1)
   })
-

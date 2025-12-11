@@ -85,9 +85,9 @@ export default function DashboardPage() {
     setIsDedupeLoading(true)
     try {
       // Get duplicate contacts
-      const contactsRes = await fetch("/api/contacts")
-      const contacts = await contactsRes.json()
-      const duplicateIds = contacts.filter((c: any) => c.isDuplicate).map((c: any) => c._id)
+      const contactsRes = await fetch("/api/contacts/duplicates")
+      const duplicates = await contactsRes.json()
+      const duplicateIds = duplicates.map((c: any) => c._id)
 
       if (duplicateIds.length < 2) {
         toast({
@@ -132,9 +132,9 @@ export default function DashboardPage() {
     setIsReassignLoading(true)
     try {
       // Get unassigned contacts
-      const contactsRes = await fetch("/api/contacts")
-      const contacts = await contactsRes.json()
-      const unassignedIds = contacts.filter((c: any) => !c.isAssigned).map((c: any) => c._id)
+      const contactsRes = await fetch("/api/contacts/unassigned")
+      const unassigned = await contactsRes.json()
+      const unassignedIds = unassigned.map((c: any) => c._id)
 
       if (unassignedIds.length === 0) {
         toast({
@@ -218,7 +218,7 @@ export default function DashboardPage() {
 
         <main className="container px-4 py-8 max-w-7xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <h1 className="text-4xl font-bold mb-2 text-balance">Data Quality Dashboard</h1>
+            <h1 className="text-4xl font-bold mb-2 text-balance">Revenue Data Health Score: {healthScore}%</h1>
             <p className="text-muted-foreground mb-8">Monitor and maintain your revenue data health</p>
           </motion.div>
 

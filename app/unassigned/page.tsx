@@ -14,12 +14,14 @@ import { useToast } from "@/hooks/use-toast"
 
 interface Contact {
   _id: string
-  name: string
   email: string
+  first_name: string
+  last_name: string
   company: string
-  isAssigned: boolean
-  hasMissingFields: boolean
-  isDuplicate: boolean
+  industry: string | null
+  owner_id: string | null
+  owner_name: string | null
+  created_date: string
 }
 
 export default function UnassignedPage() {
@@ -33,9 +35,9 @@ export default function UnassignedPage() {
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const res = await fetch("/api/contacts")
-        const contacts = await res.json()
-        setUnassignedRecords(contacts.filter((c: Contact) => !c.isAssigned))
+        const res = await fetch("/api/contacts/unassigned")
+        const unassigned = await res.json()
+        setUnassignedRecords(unassigned)
       } catch (error) {
         console.error("Error fetching contacts:", error)
         toast({
@@ -85,9 +87,9 @@ export default function UnassignedPage() {
       }
 
       // Refresh contacts
-      const contactsRes = await fetch("/api/contacts")
-      const contacts = await contactsRes.json()
-      setUnassignedRecords(contacts.filter((c: Contact) => !c.isAssigned))
+      const contactsRes = await fetch("/api/contacts/unassigned")
+      const unassigned = await contactsRes.json()
+      setUnassignedRecords(unassigned)
 
       toast({
         title: "Leads Assigned",
@@ -187,7 +189,7 @@ export default function UnassignedPage() {
                       />
                       <div className="flex-1 grid sm:grid-cols-3 gap-4">
                         <div>
-                          <p className="font-medium">{record.name}</p>
+                          <p className="font-medium">{record.first_name} {record.last_name}</p>
                           <p className="text-sm text-muted-foreground">{record.email}</p>
                         </div>
                         <div>
@@ -201,7 +203,7 @@ export default function UnassignedPage() {
                           >
                             Unassigned
                           </Badge>
-                          {record.hasMissingFields && <Badge variant="outline">Missing Data</Badge>}
+                          {!record.industry && <Badge variant="outline">Missing Industry</Badge>}
                         </div>
                       </div>
                     </motion.div>

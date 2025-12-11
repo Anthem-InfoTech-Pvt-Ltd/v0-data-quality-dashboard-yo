@@ -3,18 +3,21 @@ import { ObjectId } from "mongodb"
 export interface Company {
   _id?: ObjectId
   name: string
-  industry: string
-  hasIssues: boolean
+  website: string
+  industry: string | null
+  employee_count: number | null
 }
 
 export interface Contact {
   _id?: ObjectId
-  name: string
   email: string
+  first_name: string
+  last_name: string
   company: string
-  isAssigned: boolean
-  hasMissingFields: boolean
-  isDuplicate: boolean
+  industry: string | null
+  owner_id: string | null
+  owner_name: string | null
+  created_date: Date
 }
 
 export interface Alert {
