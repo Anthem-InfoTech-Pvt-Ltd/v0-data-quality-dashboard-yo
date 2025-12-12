@@ -41,6 +41,7 @@ export interface EmailAlert {
 export interface Lead {
   _id?: ObjectId
   fullName: string
+  email: string
   company: string
   createdDate: Date
   daysOverdue: number

@@ -31,6 +31,7 @@ interface OverdueLead {
   company: string
   createdDate: string
   daysOverdue: number
+  email?: string | null
 }
 
 export default function DashboardPage() {
@@ -175,22 +176,28 @@ export default function DashboardPage() {
     }
   }
 
-  const handleSendEmailAlert = async (leadId: string, leadName: string) => {
+  const handleSendEmailAlert = async (leadId: string, leadName: string, leadEmail?: string | null) => {
     setEmailAlertLoading(leadId)
     try {
-      await fetch("/api/leads", {
+      const response = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "send-alert", leadId }),
       })
-      toast({
-        title: "Email Alert Sent",
-        description: `Assignment reminder sent for ${leadName}`,
-      })
-    } catch (error) {
+      const result = await response.json()
+      
+      if (response.ok) {
+        toast({
+          title: "Email Alert Sent",
+          description: leadEmail ? `Alert sent to ${leadEmail}` : `Assignment reminder sent for ${leadName}`,
+        })
+      } else {
+        throw new Error(result.error || "Failed to send email")
+      }
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to send email alert",
+        description: error.message || "Failed to send email alert",
         variant: "destructive",
       })
     } finally {
@@ -417,6 +424,7 @@ export default function DashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Full Name</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead>Created Date</TableHead>
                         <TableHead className="text-center">Days Overdue</TableHead>
@@ -427,6 +435,7 @@ export default function DashboardPage() {
                       {overdueLeads.map((lead) => (
                         <TableRow key={lead._id}>
                           <TableCell className="font-medium">{lead.fullName}</TableCell>
+                          <TableCell className="text-sm">{lead.email || "N/A"}</TableCell>
                           <TableCell>{lead.company}</TableCell>
                           <TableCell>{new Date(lead.createdDate).toLocaleDateString()}</TableCell>
                           <TableCell className="text-center">
@@ -446,8 +455,9 @@ export default function DashboardPage() {
                               size="sm"
                               variant="outline"
                               className="gap-2 bg-transparent"
-                              onClick={() => handleSendEmailAlert(lead._id, lead.fullName)}
-                              disabled={emailAlertLoading === lead._id}
+                              onClick={() => handleSendEmailAlert(lead._id, lead.fullName, lead.email)}
+                              disabled={emailAlertLoading === lead._id || !lead.email}
+                              title={!lead.email ? "Contact email not found" : `Send email to ${lead.email}`}
                             >
                               <Mail className="w-4 h-4" />
                               {emailAlertLoading === lead._id ? "Sending..." : "Send Email Alert"}

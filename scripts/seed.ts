@@ -176,6 +176,18 @@ async function seed() {
       }
     }
 
+    // Add Kavita Jakhar as a test contact (unassigned)
+    contacts.push({
+      email: "kavita@antheminfotech.com",
+      first_name: "Kavita",
+      last_name: "Jakhar",
+      company: "Anthem Infotech",
+      industry: "Technology",
+      owner_id: null, // Unassigned to appear in leads
+      owner_name: null,
+      created_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+    })
+
     await db.collection("contacts").insertMany(contacts)
     console.log(`✓ Inserted ${contacts.length} contacts with unique ObjectIds`)
     console.log(`  - Duplicates: ~${duplicateCount} (email/name variations)`)
@@ -189,13 +201,23 @@ async function seed() {
         const daysSinceCreation = Math.floor((Date.now() - c.created_date.getTime()) / (24 * 60 * 60 * 1000))
         return daysSinceCreation > 1 // >24 hours
       })
-      .slice(0, 10) // Limit to 10 for demo
+      .slice(0, 9) // Limit to 9 to make room for test user
       .map(c => ({
         fullName: `${c.first_name} ${c.last_name}`,
+        email: c.email,
         company: c.company,
         createdDate: c.created_date,
         daysOverdue: Math.floor((Date.now() - c.created_date.getTime()) / (24 * 60 * 60 * 1000)) - 1,
       }))
+    
+    // Add Kavita Jakhar as a test lead
+    overdueLeads.push({
+      fullName: "Kavita Jakhar",
+      email: "kavita@antheminfotech.com",
+      company: "Anthem Infotech",
+      createdDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      daysOverdue: 2, // 2 days overdue
+    })
 
     await db.collection("leads").insertMany(overdueLeads)
     console.log(`✓ Inserted ${overdueLeads.length} overdue leads`)
