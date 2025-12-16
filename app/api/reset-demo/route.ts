@@ -1,92 +1,78 @@
 import { NextResponse } from "next/server"
-import { spawn } from "child_process"
-import * as path from "path"
+import { getDatabase } from "@/lib/mongodb"
+import { seedDatabase } from "@/lib/seed-data"
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    // Clear the in-memory chart histories by making a request to a special endpoint
-    // This ensures charts reset too
+    // Get database connection
+    const db = await getDatabase()
     
-    return new Promise((resolve) => {
-      const scriptPath = path.join(process.cwd(), "scripts", "seed.ts")
-      
-      // Use spawn instead of execSync for better error handling
-      const child = spawn("npx", ["tsx", scriptPath], {
-        cwd: process.cwd(),
-        shell: true,
-        env: process.env
-      })
-      
-      let output = ""
-      let errorOutput = ""
-      
-      child.stdout.on("data", (data) => {
-        output += data.toString()
-        console.log("Seed output:", data.toString())
-      })
-      
-      child.stderr.on("data", (data) => {
-        errorOutput += data.toString()
-        console.error("Seed error:", data.toString())
-      })
-      
-      child.on("close", async (code) => {
-        if (code === 0) {
-          // Reset chart histories by calling their reset endpoints
-          try {
-            await Promise.all([
-              fetch(`${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/charts/health-score-trend`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'reset' })
-              }),
-              fetch(`${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/charts/weekly-activity`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'reset' })
-              })
-            ])
-          } catch (error) {
-            console.log("Could not reset chart histories:", error)
-          }
-          
-          resolve(
-            NextResponse.json({ 
-              success: true, 
-              message: "Demo data has been reset successfully",
-              output: output 
-            })
+    // Seed the database directly (no child process needed)
+    const result = await seedDatabase(db)
+    
+    // Reset chart histories by calling their reset endpoints
+    // On Vercel, we need to construct the URL properly
+    let baseUrl = 'http://localhost:3000'
+    
+    if (process.env.VERCEL_URL) {
+      // Vercel provides VERCEL_URL (e.g., "my-app.vercel.app")
+      baseUrl = `https://${process.env.VERCEL_URL}`
+    } else if (process.env.NEXT_PUBLIC_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_URL
+    } else {
+      // Try to get from request headers (for serverless functions)
+      const host = request.headers.get('host')
+      const protocol = request.headers.get('x-forwarded-proto') || 'https'
+      if (host) {
+        baseUrl = `${protocol}://${host}`
+      }
+    }
+    
+    // Reset chart histories (non-blocking - charts will recalculate from DB anyway)
+    // We fire and forget these requests since charts will recalculate from fresh DB data
+    try {
+      // Use setTimeout to create a timeout for fetch requests
+      const fetchWithTimeout = (url: string, options: RequestInit, timeout = 5000) => {
+        return Promise.race([
+          fetch(url, options),
+          new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), timeout)
           )
-        } else {
-          console.error("Seed script failed with code:", code)
-          console.error("Error output:", errorOutput)
-          resolve(
-            NextResponse.json(
-              { 
-                error: "Failed to reset demo data", 
-                details: errorOutput || "Unknown error",
-                code: code 
-              },
-              { status: 500 }
-            )
-          )
-        }
-      })
+        ]).catch(() => null)
+      }
       
-      child.on("error", (err) => {
-        console.error("Failed to start seed script:", err)
-        resolve(
-          NextResponse.json(
-            { error: "Failed to start seed script", details: err.message },
-            { status: 500 }
-          )
-        )
+      // Fire and forget - don't block the response
+      Promise.all([
+        fetchWithTimeout(`${baseUrl}/api/charts/health-score-trend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reset' })
+        }).catch(() => null),
+        fetchWithTimeout(`${baseUrl}/api/charts/weekly-activity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reset' })
+        }).catch(() => null)
+      ]).catch(() => {
+        // Silently fail - charts will recalculate from fresh DB data
       })
+    } catch (error) {
+      // Chart reset is non-critical - charts recalculate from database
+      console.log("Chart reset skipped (non-critical)")
+    }
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: "Demo data has been reset successfully",
+      summary: result.summary
     })
   } catch (error: any) {
     console.error("Error resetting demo data:", error)
     return NextResponse.json(
-      { error: "Failed to reset demo data", details: error.message },
+      { 
+        error: "Failed to reset demo data", 
+        details: error.message || "Unknown error"
+      },
       { status: 500 }
     )
   }

@@ -256,21 +256,25 @@ export default function DashboardPage() {
         method: "POST",
       })
       
-      if (response.ok) {
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
         toast({
           title: "Demo Reset Complete",
-          description: "All data has been restored to the initial demo state.",
+          description: data.message || "All data has been restored to the initial demo state.",
         })
         
         // Reload the page to fetch fresh data
         window.location.reload()
       } else {
-        throw new Error("Failed to reset demo data")
+        const errorMessage = data.details || data.error || "Failed to reset demo data"
+        throw new Error(errorMessage)
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Reset demo error:", error)
       toast({
         title: "Error",
-        description: "Failed to reset demo data",
+        description: error.message || "Failed to reset demo data. Please try again.",
         variant: "destructive",
       })
       setIsResetting(false)
