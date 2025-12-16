@@ -100,7 +100,7 @@ export default function DashboardPage() {
       // Get ALL duplicate contacts - set a high limit to get everything
       const contactsRes = await fetch("/api/contacts/duplicates?page=1&limit=10000")
       const response = await contactsRes.json()
-      
+
       // Handle paginated response
       const duplicates = response.data || response
       const duplicateIds = duplicates.map((c: any) => c._id)
@@ -120,7 +120,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "merge", ids: duplicateIds }),
       })
-      
+
       if (!mergeRes.ok) {
         throw new Error("Failed to merge duplicates")
       }
@@ -154,7 +154,7 @@ export default function DashboardPage() {
       // Get ALL unassigned contacts - set a high limit to get everything
       const contactsRes = await fetch("/api/contacts/unassigned?page=1&limit=10000")
       const response = await contactsRes.json()
-      
+
       // Handle paginated response
       const unassigned = response.data || response
       const unassignedIds = unassigned.map((c: any) => c._id)
@@ -174,7 +174,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "assign", ids: unassignedIds }),
       })
-      
+
       if (!assignRes.ok) {
         throw new Error("Failed to assign leads")
       }
@@ -220,7 +220,7 @@ export default function DashboardPage() {
         body: JSON.stringify({ action: "send-alert", leadId }),
       })
       const result = await response.json()
-      
+
       if (response.ok) {
         toast({
           title: "Email Alert Sent",
@@ -414,7 +414,12 @@ export default function DashboardPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-4 w-full bg-transparent"
+
+                    className="
+    mt-4 w-full bg-transparent 
+     dark:text-white
+   dark:hover:text-gray-500
+  "
                     onClick={() => router.push("/duplicates")}
                   >
                     View Details
@@ -451,7 +456,11 @@ export default function DashboardPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-4 w-full bg-transparent"
+                      className="
+    mt-4 w-full bg-transparent 
+     dark:text-white
+   dark:hover:text-gray-500
+  "
                     onClick={() => router.push("/unassigned")}
                   >
                     View Details
@@ -488,7 +497,11 @@ export default function DashboardPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-4 w-full bg-transparent"
+                       className="
+    mt-4 w-full bg-transparent 
+     dark:text-white
+   dark:hover:text-gray-500
+  "
                     onClick={() => router.push("/missing-fields")}
                   >
                     View Details

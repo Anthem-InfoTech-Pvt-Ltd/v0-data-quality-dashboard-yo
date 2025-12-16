@@ -288,7 +288,8 @@ export default function UnassignedPage() {
                     <CardDescription>Select leads to assign to your sales team or send email alerts</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleSelectAll}>
+                    <Button variant="outline" className=" dark:text-white
+   dark:hover:text-gray-500" onClick={handleSelectAll}>
                       {selectedRecords.length === unassignedRecords.length && unassignedRecords.length > 0 
                         ? "Deselect All" 
                         : `Select All (${unassignedRecords.length})`}
@@ -342,6 +343,13 @@ export default function UnassignedPage() {
                         className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                       >
                         <Checkbox
+                        className="
+    border-gray-400
+    data-[state=checked]:bg-primary data-[state=checked]:text-white
+    dark:border-gray-600
+    dark:data-[state=checked]:bg-white
+    dark:data-[state=checked]:text-black
+  "
                           checked={selectedRecords.includes(record._id)}
                           onCheckedChange={() => handleSelectRecord(record._id)}
                         />
