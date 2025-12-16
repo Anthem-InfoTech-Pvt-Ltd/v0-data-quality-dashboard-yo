@@ -170,5 +170,3 @@ The score is expressed as a percentage (0-100%), where 100% represents perfect d
 
 ---
 
-*For technical setup and deployment instructions, refer to the main README.md file.*
-
