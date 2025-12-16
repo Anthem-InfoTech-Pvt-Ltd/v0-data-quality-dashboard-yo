@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse, NextRequest } from "next/server"
 import { getDatabase } from "@/lib/mongodb"
 
 // Helper function to normalize email for duplicate detection
@@ -6,8 +6,13 @@ function normalizeEmail(email: string): string {
   return email.split("+")[0].split("@")[0].toLowerCase() + "@" + email.split("@")[1]
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const skip = (page - 1) * limit
+    
     const db = await getDatabase()
     const contacts = await db.collection("contacts").find({}).toArray()
     
@@ -58,7 +63,26 @@ export async function GET() {
       }
     })
     
-    return NextResponse.json(duplicateContacts)
+    // Sort duplicates for consistent ordering
+    duplicateContacts.sort((a, b) => {
+      const dateA = new Date(a.created_date).getTime()
+      const dateB = new Date(b.created_date).getTime()
+      return dateB - dateA // Most recent first
+    })
+    
+    // Apply pagination
+    const totalCount = duplicateContacts.length
+    const paginatedContacts = duplicateContacts.slice(skip, skip + limit)
+    const hasMore = skip + limit < totalCount
+    
+    return NextResponse.json({
+      data: paginatedContacts,
+      page,
+      limit,
+      totalCount,
+      hasMore,
+      totalPages: Math.ceil(totalCount / limit)
+    })
   } catch (error) {
     console.error("Error fetching duplicates:", error)
     return NextResponse.json({ error: "Failed to fetch duplicates" }, { status: 500 })

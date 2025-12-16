@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
+import InfiniteScroll from "react-infinite-scroll-component"
 
 const missingFieldTypes = ["Phone Number", "Job Title", "Address", "Revenue", "Industry"]
 
@@ -26,6 +27,15 @@ interface Contact {
   created_date: string
 }
 
+interface PaginatedResponse {
+  data: Contact[]
+  page: number
+  limit: number
+  totalCount: number
+  hasMore: boolean
+  totalPages: number
+}
+
 export default function MissingFieldsPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -33,32 +43,51 @@ export default function MissingFieldsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [missingFieldRecords, setMissingFieldRecords] = useState<Contact[]>([])
   const [isFetching, setIsFetching] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    const fetchContacts = async () => {
-      try {
-        const res = await fetch("/api/contacts/missing-fields")
-        const missingFields = await res.json()
-        setMissingFieldRecords(missingFields)
-      } catch (error) {
-        console.error("Error fetching contacts:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load missing field records",
-          variant: "destructive",
-        })
-      } finally {
+  const fetchContacts = useCallback(async (pageNum: number, isInitial: boolean = false) => {
+    try {
+      const res = await fetch(`/api/contacts/missing-fields?page=${pageNum}&limit=50`)
+      const response: PaginatedResponse = await res.json()
+      
+      if (isInitial) {
+        setMissingFieldRecords(response.data)
+      } else {
+        setMissingFieldRecords(prev => [...prev, ...response.data])
+      }
+      
+      setHasMore(response.hasMore)
+      setTotalCount(response.totalCount)
+      setPage(pageNum)
+    } catch (error) {
+      console.error("Error fetching contacts:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load missing field records",
+        variant: "destructive",
+      })
+    } finally {
+      if (isInitial) {
         setIsFetching(false)
       }
     }
-    fetchContacts()
   }, [toast])
+
+  useEffect(() => {
+    fetchContacts(1, true)
+  }, [fetchContacts])
+
+  const loadMore = () => {
+    fetchContacts(page + 1)
+  }
 
   const handleSelectAll = () => {
     if (selectedRecords.length === missingFieldRecords.length) {
       setSelectedRecords([])
     } else {
-      setSelectedRecords(missingFieldRecords.map((r) => r.id))
+      setSelectedRecords(missingFieldRecords.map((r) => r._id))
     }
   }
 
@@ -88,10 +117,10 @@ export default function MissingFieldsPage() {
         throw new Error("Failed to update fields")
       }
 
-      // Refresh contacts
-      const contactsRes = await fetch("/api/contacts/missing-fields")
-      const missingFields = await contactsRes.json()
-      setMissingFieldRecords(missingFields)
+      // Refresh contacts from the beginning
+      setMissingFieldRecords([])
+      setPage(1)
+      await fetchContacts(1, true)
 
       toast({
         title: "Fields Updated",
@@ -146,7 +175,7 @@ export default function MissingFieldsPage() {
               <div>
                 <h1 className="text-4xl font-bold text-balance">Missing Fields Records</h1>
                 <p className="text-muted-foreground">
-                  {missingFieldRecords.length} records with incomplete data requiring enrichment
+                  {totalCount} records with incomplete data requiring enrichment
                 </p>
               </div>
             </div>
@@ -166,7 +195,9 @@ export default function MissingFieldsPage() {
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleSelectAll}>
-                      {selectedRecords.length === missingFieldRecords.length ? "Deselect All" : "Select All"}
+                      {selectedRecords.length === missingFieldRecords.length && missingFieldRecords.length > 0 
+                        ? "Deselect All" 
+                        : `Select All (${missingFieldRecords.length})`}
                     </Button>
                     <Button
                       onClick={handleUpdateFields}
@@ -180,41 +211,60 @@ export default function MissingFieldsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {missingFieldRecords.map((record, index) => (
-                    <motion.div
-                      key={record.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + index * 0.05, duration: 0.3 }}
-                      className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <Checkbox
-                        checked={selectedRecords.includes(record._id)}
-                        onCheckedChange={() => handleSelectRecord(record._id)}
-                      />
-                      <div className="flex-1 grid sm:grid-cols-3 gap-4">
-                        <div>
-                          <p className="font-medium">{record.first_name} {record.last_name}</p>
-                          <p className="text-sm text-muted-foreground">{record.email}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{record.company}</p>
-                          <p className="text-sm text-muted-foreground">Company</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-300"
-                          >
-                            Missing: Industry
-                          </Badge>
-                          {!record.owner_id && <Badge variant="outline">Unassigned</Badge>}
-                        </div>
+                <InfiniteScroll
+                  dataLength={missingFieldRecords.length}
+                  next={loadMore}
+                  hasMore={hasMore}
+                  loader={
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  }
+                  endMessage={
+                    missingFieldRecords.length > 0 && (
+                      <div className="text-center py-4 text-muted-foreground">
+                        All {totalCount} missing field records loaded
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
+                    )
+                  }
+                  style={{ overflow: 'visible' }}
+                >
+                  <div className="space-y-3">
+                    {missingFieldRecords.map((record, index) => (
+                      <motion.div
+                        key={record._id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: Math.min(0.3 + (index % 10) * 0.05, 0.8), duration: 0.3 }}
+                        className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                      >
+                        <Checkbox
+                          checked={selectedRecords.includes(record._id)}
+                          onCheckedChange={() => handleSelectRecord(record._id)}
+                        />
+                        <div className="flex-1 grid sm:grid-cols-3 gap-4">
+                          <div>
+                            <p className="font-medium">{record.first_name} {record.last_name}</p>
+                            <p className="text-sm text-muted-foreground">{record.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{record.company}</p>
+                            <p className="text-sm text-muted-foreground">Company</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-300"
+                            >
+                              Missing: Industry
+                            </Badge>
+                            {!record.owner_id && <Badge variant="outline">Unassigned</Badge>}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </InfiniteScroll>
               </CardContent>
             </Card>
           </motion.div>

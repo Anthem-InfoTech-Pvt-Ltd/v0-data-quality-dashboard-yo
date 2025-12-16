@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
+import InfiniteScroll from "react-infinite-scroll-component"
 
 interface Contact {
   _id: string
@@ -24,6 +25,15 @@ interface Contact {
   created_date: string
 }
 
+interface PaginatedResponse {
+  data: Contact[]
+  page: number
+  limit: number
+  totalCount: number
+  hasMore: boolean
+  totalPages: number
+}
+
 export default function DuplicatesPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -31,32 +41,51 @@ export default function DuplicatesPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [duplicateRecords, setDuplicateRecords] = useState<Contact[]>([])
   const [isFetching, setIsFetching] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    const fetchContacts = async () => {
-      try {
-        const res = await fetch("/api/contacts/duplicates")
-        const duplicates = await res.json()
-        setDuplicateRecords(duplicates)
-      } catch (error) {
-        console.error("Error fetching contacts:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load duplicate records",
-          variant: "destructive",
-        })
-      } finally {
+  const fetchContacts = useCallback(async (pageNum: number, isInitial: boolean = false) => {
+    try {
+      const res = await fetch(`/api/contacts/duplicates?page=${pageNum}&limit=50`)
+      const response: PaginatedResponse = await res.json()
+      
+      if (isInitial) {
+        setDuplicateRecords(response.data)
+      } else {
+        setDuplicateRecords(prev => [...prev, ...response.data])
+      }
+      
+      setHasMore(response.hasMore)
+      setTotalCount(response.totalCount)
+      setPage(pageNum)
+    } catch (error) {
+      console.error("Error fetching contacts:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load duplicate records",
+        variant: "destructive",
+      })
+    } finally {
+      if (isInitial) {
         setIsFetching(false)
       }
     }
-    fetchContacts()
   }, [toast])
+
+  useEffect(() => {
+    fetchContacts(1, true)
+  }, [fetchContacts])
+
+  const loadMore = () => {
+    fetchContacts(page + 1)
+  }
 
   const handleSelectAll = () => {
     if (selectedRecords.length === duplicateRecords.length) {
       setSelectedRecords([])
     } else {
-      setSelectedRecords(duplicateRecords.map((r) => r.id))
+      setSelectedRecords(duplicateRecords.map((r) => r._id))
     }
   }
 
@@ -86,10 +115,10 @@ export default function DuplicatesPage() {
         throw new Error("Failed to merge duplicates")
       }
 
-      // Refresh contacts
-      const contactsRes = await fetch("/api/contacts/duplicates")
-      const duplicates = await contactsRes.json()
-      setDuplicateRecords(duplicates)
+      // Refresh contacts from the beginning
+      setDuplicateRecords([])
+      setPage(1)
+      await fetchContacts(1, true)
 
       toast({
         title: "Duplicates Merged",
@@ -140,7 +169,7 @@ export default function DuplicatesPage() {
               <div>
                 <h1 className="text-4xl font-bold text-balance">Duplicate Detection Records</h1>
                 <p className="text-muted-foreground">
-                  {duplicateRecords.length} duplicate records found across contacts and companies
+                  {totalCount} duplicate records found across contacts and companies
                 </p>
               </div>
             </div>
@@ -160,7 +189,9 @@ export default function DuplicatesPage() {
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleSelectAll}>
-                      {selectedRecords.length === duplicateRecords.length ? "Deselect All" : "Select All"}
+                      {selectedRecords.length === duplicateRecords.length && duplicateRecords.length > 0 
+                        ? "Deselect All" 
+                        : `Select All (${duplicateRecords.length})`}
                     </Button>
                     <Button
                       onClick={handleMergeDuplicates}
@@ -174,36 +205,55 @@ export default function DuplicatesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {duplicateRecords.map((record, index) => (
-                    <motion.div
-                      key={record.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + index * 0.05, duration: 0.3 }}
-                      className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <Checkbox
-                        checked={selectedRecords.includes(record._id)}
-                        onCheckedChange={() => handleSelectRecord(record._id)}
-                      />
-                      <div className="flex-1 grid sm:grid-cols-3 gap-4">
-                        <div>
-                          <p className="font-medium">{record.first_name} {record.last_name}</p>
-                          <p className="text-sm text-muted-foreground">{record.email}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{record.company}</p>
-                          <p className="text-sm text-muted-foreground">Company</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="destructive">Duplicate</Badge>
-                          <Badge variant="outline">{record.owner_id ? "Assigned" : "Unassigned"}</Badge>
-                        </div>
+                <InfiniteScroll
+                  dataLength={duplicateRecords.length}
+                  next={loadMore}
+                  hasMore={hasMore}
+                  loader={
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  }
+                  endMessage={
+                    duplicateRecords.length > 0 && (
+                      <div className="text-center py-4 text-muted-foreground">
+                        All {totalCount} duplicate records loaded
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
+                    )
+                  }
+                  style={{ overflow: 'visible' }}
+                >
+                  <div className="space-y-3">
+                    {duplicateRecords.map((record, index) => (
+                      <motion.div
+                        key={record._id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: Math.min(0.3 + (index % 10) * 0.05, 0.8), duration: 0.3 }}
+                        className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                      >
+                        <Checkbox
+                          checked={selectedRecords.includes(record._id)}
+                          onCheckedChange={() => handleSelectRecord(record._id)}
+                        />
+                        <div className="flex-1 grid sm:grid-cols-3 gap-4">
+                          <div>
+                            <p className="font-medium">{record.first_name} {record.last_name}</p>
+                            <p className="text-sm text-muted-foreground">{record.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{record.company}</p>
+                            <p className="text-sm text-muted-foreground">Company</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive">Duplicate</Badge>
+                            <Badge variant="outline">{record.owner_id ? "Assigned" : "Unassigned"}</Badge>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </InfiniteScroll>
               </CardContent>
             </Card>
           </motion.div>

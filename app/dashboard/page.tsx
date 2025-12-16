@@ -85,9 +85,12 @@ export default function DashboardPage() {
   const handleRunDedupe = async () => {
     setIsDedupeLoading(true)
     try {
-      // Get duplicate contacts
-      const contactsRes = await fetch("/api/contacts/duplicates")
-      const duplicates = await contactsRes.json()
+      // Get ALL duplicate contacts - set a high limit to get everything
+      const contactsRes = await fetch("/api/contacts/duplicates?page=1&limit=10000")
+      const response = await contactsRes.json()
+      
+      // Handle paginated response
+      const duplicates = response.data || response
       const duplicateIds = duplicates.map((c: any) => c._id)
 
       if (duplicateIds.length < 2) {
@@ -99,12 +102,16 @@ export default function DashboardPage() {
         return
       }
 
-      // Merge duplicates
-      await fetch("/api/contacts", {
+      // Merge ALL duplicates collectively
+      const mergeRes = await fetch("/api/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "merge", ids: duplicateIds }),
       })
+      
+      if (!mergeRes.ok) {
+        throw new Error("Failed to merge duplicates")
+      }
 
       // Refresh data
       const [metricsRes, healthScoreRes] = await Promise.all([
@@ -116,7 +123,7 @@ export default function DashboardPage() {
 
       toast({
         title: "Deduplication Complete",
-        description: "Successfully identified and merged duplicate records.",
+        description: `Successfully merged all ${duplicateIds.length} duplicate records.`,
       })
     } catch (error) {
       toast({
@@ -132,9 +139,12 @@ export default function DashboardPage() {
   const handleReassignLeads = async () => {
     setIsReassignLoading(true)
     try {
-      // Get unassigned contacts
-      const contactsRes = await fetch("/api/contacts/unassigned")
-      const unassigned = await contactsRes.json()
+      // Get ALL unassigned contacts - set a high limit to get everything
+      const contactsRes = await fetch("/api/contacts/unassigned?page=1&limit=10000")
+      const response = await contactsRes.json()
+      
+      // Handle paginated response
+      const unassigned = response.data || response
       const unassignedIds = unassigned.map((c: any) => c._id)
 
       if (unassignedIds.length === 0) {
@@ -146,12 +156,16 @@ export default function DashboardPage() {
         return
       }
 
-      // Assign leads
-      await fetch("/api/contacts", {
+      // Assign ALL leads collectively
+      const assignRes = await fetch("/api/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "assign", ids: unassignedIds }),
       })
+      
+      if (!assignRes.ok) {
+        throw new Error("Failed to assign leads")
+      }
 
       // Refresh data
       const [metricsRes, healthScoreRes] = await Promise.all([
@@ -163,7 +177,7 @@ export default function DashboardPage() {
 
       toast({
         title: "Leads Reassigned",
-        description: "Successfully reassigned unassigned leads to sales team.",
+        description: `Successfully reassigned all ${unassignedIds.length} leads to sales team.`,
       })
     } catch (error) {
       toast({

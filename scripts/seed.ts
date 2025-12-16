@@ -1,6 +1,7 @@
 import { MongoClient, ObjectId } from "mongodb"
 import * as dotenv from "dotenv"
 import * as path from "path"
+import { Contact } from "@/lib/models"
 
 // Load environment variables from .env.local
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") })
@@ -38,13 +39,8 @@ async function seed() {
   let client: MongoClient | null = null
 
   try {
-    console.log("Connecting to MongoDB...")
-    console.log("URI:", uri.replace(/\/\/.*@/, "//***:***@"))
-    
     client = new MongoClient(uri)
     await client.connect()
-    console.log("✓ Connected to MongoDB")
-
     let dbName = "dataqualitydashboard"
     if (uri.includes("/")) {
       const uriParts = uri.split("/")
@@ -53,21 +49,15 @@ async function seed() {
     }
     
     const db = client.db(dbName)
-    console.log(`Using database: ${dbName}`)
 
-    // Clear existing collections
-    console.log("Clearing existing collections...")
     await db.collection("companies").deleteMany({})
     await db.collection("contacts").deleteMany({})
     await db.collection("alerts").deleteMany({})
     await db.collection("emailAlerts").deleteMany({})
     await db.collection("leads").deleteMany({})
-    console.log("✓ Cleared existing collections")
 
-    // Generate 20-30 companies
-    const numCompanies = Math.floor(Math.random() * 11) + 20 // 20-30
-    console.log(`Generating ${numCompanies} companies...`)
-    console.log(`Available company names: ${companyNames.length}`)
+    // Generate 100-150 companies for realistic data volume
+    const numCompanies = Math.floor(Math.random() * 51) + 100 
     
     const companies = []
     for (let i = 0; i < numCompanies; i++) {
@@ -93,15 +83,15 @@ async function seed() {
     await db.collection("companies").insertMany(companies)
     console.log(`✓ Inserted ${companies.length} companies with unique ObjectIds`)
 
-    // Generate 80-100 contacts
-    const numContacts = Math.floor(Math.random() * 21) + 80 // 80-100
+    // Generate 2,000-5,000 contacts for realistic data volume
+    const numContacts = Math.floor(Math.random() * 3001) + 2000 // 2000-5000
     console.log(`Generating ${numContacts} contacts...`)
     
     const contacts = []
-    const emailMap = new Map<string, number>() // Track emails for duplicates
-    const duplicateEmails: string[] = [] // Store emails to duplicate
+    const emailMap = new Map<string, number>() 
+    const duplicateEmails: string[] = [] 
     
-    // First pass: create unique contacts
+    
     for (let i = 0; i < numContacts; i++) {
       const companyIndex = i % companies.length
       const company = companies[companyIndex]
@@ -115,8 +105,7 @@ async function seed() {
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
       const baseEmail = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${company.name.toLowerCase().replace(/\s+/g, "")}.com`
       
-      // Determine if this will be a duplicate (25% duplicates)
-      const willBeDuplicate = i < Math.floor(numContacts * 0.25)
+      const willBeDuplicate = i < Math.floor(numContacts * 0.10) // ~10% will have duplicates (300-500 contacts)
       
       let email = baseEmail
       if (emailMap.has(baseEmail)) {
@@ -130,10 +119,8 @@ async function seed() {
         duplicateEmails.push(email)
       }
       
-      // 30% unassigned (owner_id = null)
-      const isUnassigned = i < Math.floor(numContacts * 0.30)
-      // 25% missing industry
-      const hasMissingIndustry = i >= Math.floor(numContacts * 0.30) && i < Math.floor(numContacts * 0.55)
+      const isUnassigned = i < Math.floor(numContacts * 0.04) // ~4% unassigned (150-200 contacts)
+      const hasMissingIndustry = i >= Math.floor(numContacts * 0.04) && i < Math.floor(numContacts * 0.10) // ~6% missing industry (200-300 contacts)
       
       const owner = isUnassigned ? null : salesOwners[Math.floor(Math.random() * salesOwners.length)]
       
@@ -149,19 +136,17 @@ async function seed() {
       })
     }
     
-    // Second pass: create duplicate variations (25% duplicates)
-    const duplicateCount = Math.floor(numContacts * 0.25)
+    const duplicateCount = Math.floor(numContacts * 0.10) // ~10% duplicates (300-500)
     for (let i = 0; i < duplicateCount && duplicateEmails.length > 0; i++) {
       const originalEmail = duplicateEmails[i % duplicateEmails.length]
-      const originalContact = contacts.find(c => c.email === originalEmail)
+      const originalContact: Contact | undefined = contacts.find((c: Contact) => c.email === originalEmail)
       if (originalContact) {
-        // Create variations: different email format, slight name variation
-        const variations = [
+        const variations: { email: string; first_name: string; last_name: string }[] = [
           { email: originalEmail.replace("@", "+1@"), first_name: originalContact.first_name, last_name: originalContact.last_name },
           { email: originalEmail.replace(".", "_"), first_name: originalContact.first_name, last_name: originalContact.last_name + " Jr" },
           { email: originalEmail.replace(originalContact.first_name.toLowerCase(), originalContact.first_name.toLowerCase().charAt(0)), first_name: originalContact.first_name, last_name: originalContact.last_name },
         ]
-        const variation = variations[i % variations.length]
+        const variation: { email: string; first_name: string; last_name: string } = variations[i % variations.length]
         
         contacts.push({
           email: variation.email,
@@ -191,18 +176,19 @@ async function seed() {
     await db.collection("contacts").insertMany(contacts)
     console.log(`✓ Inserted ${contacts.length} contacts with unique ObjectIds`)
     console.log(`  - Duplicates: ~${duplicateCount} (email/name variations)`)
-    console.log(`  - Unassigned: ~${Math.floor(numContacts * 0.30)} (owner_id = null)`)
-    console.log(`  - Missing Industry: ~${Math.floor(numContacts * 0.25)} (industry = null)`)
+    console.log(`  - Unassigned: ~${Math.floor(numContacts * 0.04)} (owner_id = null)`)
+    console.log(`  - Missing Industry: ~${Math.floor(numContacts * 0.06)} (industry = null)`)
 
     // Generate leads (unassigned contacts >24h old)
     const unassignedContacts = contacts.filter(c => !c.owner_id)
-    const overdueLeads = unassignedContacts
+    const overdueContacts = unassignedContacts
       .filter(c => {
         const daysSinceCreation = Math.floor((Date.now() - c.created_date.getTime()) / (24 * 60 * 60 * 1000))
         return daysSinceCreation > 1 // >24 hours
       })
-      .slice(0, 9) // Limit to 9 to make room for test user
-      .map(c => ({
+      .slice(0, 150) // Limit to 150 leads for demo purposes
+    
+    const overdueLeads = overdueContacts.map(c => ({
         fullName: `${c.first_name} ${c.last_name}`,
         email: c.email,
         company: c.company,
@@ -248,13 +234,13 @@ async function seed() {
     await db.collection("alerts").insertMany(alerts)
     console.log(`✓ Inserted ${alerts.length} alerts with unique ObjectIds`)
 
-    // Insert email alerts for unassigned leads >24h
-    const emailAlerts = overdueLeads.slice(0, 5).map((lead, index) => ({
+    // Insert email alerts for unassigned leads >24h (sample of 20 for dashboard)
+    const emailAlerts = overdueLeads.slice(0, 20).map((lead, index) => ({
       subject: `Unassigned Lead Alert: ${lead.fullName} - ${lead.company}`,
       from: "alerts@revenuehealth.com",
       preview: `Lead ${lead.fullName} from ${lead.company} has been unassigned for ${lead.daysOverdue} days. Please assign to a sales representative...`,
       timestamp: new Date(Date.now() - 1000 * 60 * (10 + index * 5)),
-      isRead: index < 2, // First 2 are read
+      isRead: index < 8, // First 8 are read
       priority: lead.daysOverdue >= 5 ? "high" : "normal",
     }))
 
