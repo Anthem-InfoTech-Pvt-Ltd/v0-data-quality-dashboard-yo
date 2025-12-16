@@ -5,16 +5,34 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useEffect, useState } from "react"
 
 export function WeeklyActivityChart() {
-  const [data, setData] = useState<{ day: string; resolved: number; detected: number }[]>([])
+  // Initialize with default data to prevent empty chart
+  const defaultData = [
+    { day: "Mon", detected: 0, resolved: 0 },
+    { day: "Tue", detected: 0, resolved: 0 },
+    { day: "Wed", detected: 0, resolved: 0 },
+    { day: "Thu", detected: 0, resolved: 0 },
+    { day: "Fri", detected: 0, resolved: 0 },
+    { day: "Sat", detected: 0, resolved: 0 },
+    { day: "Sun", detected: 0, resolved: 0 }
+  ]
+  
+  const [data, setData] = useState<{ day: string; resolved: number; detected: number }[]>(defaultData)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await fetch("/api/charts/weekly-activity")
         const chartData = await res.json()
-        setData(chartData)
+        if (chartData && Array.isArray(chartData) && chartData.length > 0) {
+          setData(chartData)
+        } else {
+          // Keep default structure if no data
+          setData(defaultData)
+        }
       } catch (error) {
         console.error("Error fetching weekly activity:", error)
+        // Keep default structure on error
+        setData(defaultData)
       }
     }
     fetchData()

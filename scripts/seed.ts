@@ -190,7 +190,7 @@ async function seed() {
     
     const overdueLeads = overdueContacts.map(c => ({
         fullName: `${c.first_name} ${c.last_name}`,
-        email: c.email,
+        email: c.email, // All contacts have emails, no N/A
         company: c.company,
         createdDate: c.created_date,
         daysOverdue: Math.floor((Date.now() - c.created_date.getTime()) / (24 * 60 * 60 * 1000)) - 1,

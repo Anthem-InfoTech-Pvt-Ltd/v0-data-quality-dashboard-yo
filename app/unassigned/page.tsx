@@ -154,6 +154,15 @@ export default function UnassignedPage() {
           title: "Email Alert Sent",
           description: `Alert sent to ${contactEmail}`,
         })
+        
+        // Remove the lead from the list immediately
+        setUnassignedRecords(prev => prev.filter(record => record._id !== contactId))
+        
+        // Update the total count
+        setTotalCount(prev => Math.max(0, prev - 1))
+        
+        // Remove from selected records if it was selected
+        setSelectedRecords(prev => prev.filter(id => id !== contactId))
       } else {
         throw new Error(result.error || "Failed to send email")
       }
@@ -205,6 +214,14 @@ export default function UnassignedPage() {
           title: "Email Alerts Sent",
           description: result.message,
         })
+        
+        // Remove all selected leads from the list immediately
+        setUnassignedRecords(prev => prev.filter(record => !selectedRecords.includes(record._id)))
+        
+        // Update the total count
+        setTotalCount(prev => Math.max(0, prev - selectedRecords.length))
+        
+        // Clear selected records
         setSelectedRecords([])
       } else {
         throw new Error(result.error || result.message || "Failed to send emails")

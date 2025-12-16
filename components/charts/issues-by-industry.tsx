@@ -5,16 +5,33 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useEffect, useState } from "react"
 
 export function IssuesByIndustryChart() {
-  const [data, setData] = useState<{ industry: string; issues: number }[]>([])
+  // Initialize with default industries to prevent chart from disappearing
+  const defaultData = [
+    { industry: "Technology", issues: 0 },
+    { industry: "Finance", issues: 0 },
+    { industry: "Healthcare", issues: 0 },
+    { industry: "Retail", issues: 0 },
+    { industry: "Manufacturing", issues: 0 }
+  ]
+  
+  const [data, setData] = useState<{ industry: string; issues: number }[]>(defaultData)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await fetch("/api/charts/issues-by-industry")
         const chartData = await res.json()
-        setData(chartData)
+        // If we have data, use it; otherwise keep the default structure
+        if (chartData && chartData.length > 0) {
+          setData(chartData)
+        } else {
+          // Keep default structure but with zero values
+          setData(defaultData)
+        }
       } catch (error) {
         console.error("Error fetching issues by industry:", error)
+        // Keep default structure on error
+        setData(defaultData)
       }
     }
     fetchData()

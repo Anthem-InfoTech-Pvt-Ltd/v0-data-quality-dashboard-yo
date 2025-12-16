@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Database, Mail, Merge, Sparkles, UserPlus, UserX, XCircle } from "lucide-react"
+import { Database, Mail, Merge, Sparkles, UserPlus, UserX, XCircle, RotateCcw } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +16,17 @@ import { IssuesByIndustryChart } from "@/components/charts/issues-by-industry"
 import { WeeklyActivityChart } from "@/components/charts/weekly-activity"
 import { useRouter } from "next/navigation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Metrics {
   duplicates: number
@@ -50,6 +61,7 @@ export default function DashboardPage() {
   const [isDedupeLoading, setIsDedupeLoading] = useState(false)
   const [isReassignLoading, setIsReassignLoading] = useState(false)
   const [emailAlertLoading, setEmailAlertLoading] = useState<string | null>(null)
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -191,6 +203,15 @@ export default function DashboardPage() {
   }
 
   const handleSendEmailAlert = async (leadId: string, leadName: string, leadEmail?: string | null) => {
+    if (!leadEmail) {
+      toast({
+        title: "Email Required",
+        description: "Cannot send alert - email address is missing",
+        variant: "destructive",
+      })
+      return
+    }
+    
     setEmailAlertLoading(leadId)
     try {
       const response = await fetch("/api/leads", {
@@ -203,8 +224,17 @@ export default function DashboardPage() {
       if (response.ok) {
         toast({
           title: "Email Alert Sent",
-          description: leadEmail ? `Alert sent to ${leadEmail}` : `Assignment reminder sent for ${leadName}`,
+          description: `Alert sent to ${leadEmail}`,
         })
+        
+        // Remove the lead from the list immediately
+        setOverdueLeads(prev => prev.filter(lead => lead._id !== leadId))
+        
+        // Update metrics
+        setMetrics(prev => ({
+          ...prev,
+          overdueLeads: Math.max(0, prev.overdueLeads - 1)
+        }))
       } else {
         throw new Error(result.error || "Failed to send email")
       }
@@ -216,6 +246,34 @@ export default function DashboardPage() {
       })
     } finally {
       setEmailAlertLoading(null)
+    }
+  }
+  
+  const handleResetDemo = async () => {
+    setIsResetting(true)
+    try {
+      const response = await fetch("/api/reset-demo", {
+        method: "POST",
+      })
+      
+      if (response.ok) {
+        toast({
+          title: "Demo Reset Complete",
+          description: "All data has been restored to the initial demo state.",
+        })
+        
+        // Reload the page to fetch fresh data
+        window.location.reload()
+      } else {
+        throw new Error("Failed to reset demo data")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reset demo data",
+        variant: "destructive",
+      })
+      setIsResetting(false)
     }
   }
 
@@ -238,6 +296,37 @@ export default function DashboardPage() {
         <Header />
 
         <main className="container px-4 py-8 max-w-7xl mx-auto">
+          {/* Reset Demo Button */}
+          <div className="flex justify-end mb-4">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  disabled={isResetting}
+                  className="gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {isResetting ? "Resetting..." : "Reset Demo Data"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset Demo Data?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will restore all data to the initial demo state. All changes made during this session will be lost.
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleResetDemo}>
+                    Reset Demo Data
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <h1 className="text-4xl font-bold mb-2 text-balance">Revenue Data Health Score: {healthScore}%</h1>
             <p className="text-muted-foreground mb-8">Monitor and maintain your revenue data health</p>
@@ -446,39 +535,46 @@ export default function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {overdueLeads.map((lead) => (
-                        <TableRow key={lead._id}>
-                          <TableCell className="font-medium">{lead.fullName}</TableCell>
-                          <TableCell className="text-sm">{lead.email || "N/A"}</TableCell>
-                          <TableCell>{lead.company}</TableCell>
-                          <TableCell>{new Date(lead.createdDate).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge
-                              variant={lead.daysOverdue >= 5 ? "destructive" : "outline"}
-                              className={
-                                lead.daysOverdue >= 5
-                                  ? ""
-                                  : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-300"
-                              }
-                            >
-                              {lead.daysOverdue} days
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-2 bg-transparent"
-                              onClick={() => handleSendEmailAlert(lead._id, lead.fullName, lead.email)}
-                              disabled={emailAlertLoading === lead._id || !lead.email}
-                              title={!lead.email ? "Contact email not found" : `Send email to ${lead.email}`}
-                            >
-                              <Mail className="w-4 h-4" />
-                              {emailAlertLoading === lead._id ? "Sending..." : "Send Email Alert"}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {overdueLeads.filter(lead => lead.email && lead.email !== "N/A").map((lead) => {
+                        // Calculate days overdue dynamically
+                        const createdDate = new Date(lead.createdDate)
+                        const now = new Date()
+                        const daysOverdue = Math.max(0, Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)) - 1)
+                        
+                        return (
+                          <TableRow key={lead._id}>
+                            <TableCell className="font-medium">{lead.fullName}</TableCell>
+                            <TableCell className="text-sm">{lead.email}</TableCell>
+                            <TableCell>{lead.company}</TableCell>
+                            <TableCell>{createdDate.toLocaleDateString()}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge
+                                variant={daysOverdue >= 5 ? "destructive" : "outline"}
+                                className={
+                                  daysOverdue >= 5
+                                    ? ""
+                                    : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-300"
+                                }
+                              >
+                                {daysOverdue} days
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2 bg-transparent"
+                                onClick={() => handleSendEmailAlert(lead._id, lead.fullName, lead.email)}
+                                disabled={emailAlertLoading === lead._id}
+                                title={`Send email to ${lead.email}`}
+                              >
+                                <Mail className="w-4 h-4" />
+                                {emailAlertLoading === lead._id ? "Sending..." : "Send Email Alert"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>
