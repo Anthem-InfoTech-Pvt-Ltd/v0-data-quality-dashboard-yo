@@ -307,7 +307,7 @@ export default function DashboardPage() {
                 <Button 
                   variant="outline" 
                   disabled={isResetting}
-                  className="gap-2"
+                  className="gap-2 dark:hover:text-gray-500"
                 >
                   <RotateCcw className="w-4 h-4" />
                   {isResetting ? "Resetting..." : "Reset Demo Data"}
@@ -580,7 +580,7 @@ export default function DashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-2 bg-transparent"
+                                className="gap-2 bg-transparent dark:hover:text-gray-500"
                                 onClick={() => handleSendEmailAlert(lead._id, lead.fullName, lead.email)}
                                 disabled={emailAlertLoading === lead._id}
                                 title={`Send email to ${lead.email}`}
