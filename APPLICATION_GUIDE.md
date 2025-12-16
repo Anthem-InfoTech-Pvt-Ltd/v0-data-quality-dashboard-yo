@@ -1,19 +1,7 @@
 # Revenue Data Health Score Dashboard - Application Guide
 
-## Overview
 
-The **Revenue Data Health Score Dashboard** is a comprehensive data quality monitoring and management application designed to help organizations maintain clean, accurate, and actionable revenue data. The application provides real-time insights into data quality issues, automated remediation tools, and visual analytics to track data health over time.
-
-## Purpose
-
-This application addresses common data quality challenges in revenue operations (RevOps) and customer relationship management (CRM) systems by:
-
-- **Identifying Data Issues**: Automatically detects duplicates, unassigned leads, and missing critical fields
-- **Calculating Health Scores**: Provides a quantifiable metric (0-100%) representing overall data quality
-- **Enabling Quick Remediation**: Offers one-click actions to fix common data problems
-- **Tracking Trends**: Visualizes data quality improvements over time through interactive charts
-
-## Key Features
+Features
 
 ### 1. Health Score Dashboard
 
@@ -171,20 +159,6 @@ The score is expressed as a percentage (0-100%), where 100% represents perfect d
 5. **Monitor Progress**: View updated health score and charts
 6. **Repeat**: Continue monitoring and improving data quality
 
-### Quick Actions
-
-- **Run Dedupe**: One-click deduplication of all duplicate records
-- **Reassign Leads**: Bulk assignment of all unassigned leads
-- **Send Email Alerts**: Notify contacts about unassigned status
-- **Reset Demo Data**: Restore application to initial demo state (for testing)
-
-## Benefits
-
-- **Improved Data Quality**: Systematic identification and resolution of data issues
-- **Time Savings**: Automated detection and one-click remediation
-- **Better Sales Operations**: Ensures leads are properly assigned and tracked
-- **Data-Driven Decisions**: Visual analytics help identify trends and patterns
-- **Compliance**: Maintains clean, accurate records for reporting and compliance
 
 ## Getting Started
 
