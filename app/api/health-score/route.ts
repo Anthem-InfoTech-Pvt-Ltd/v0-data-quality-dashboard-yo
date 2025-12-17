@@ -50,12 +50,50 @@ export async function GET() {
   try {
     const db = await getDatabase()
     
-    const [duplicates, unassignedLeads, missingFields, totalContacts, overdueLeads] = await Promise.all([
+    // Filter for unassigned leads that haven't had email alerts sent
+    const unassignedFilter = { 
+      owner_id: null,
+      $or: [
+        { email_alert_sent_at: { $exists: false } },
+        { email_alert_sent_at: null }
+      ]
+    }
+    
+    // Count overdue leads whose contacts haven't had alerts sent
+    // Get all contacts that have alerts sent (to exclude them)
+    const contactsWithAlerts = await db.collection("contacts")
+      .find({ 
+        email_alert_sent_at: { $exists: true, $ne: null } 
+      })
+      .project({ first_name: 1, last_name: 1, company: 1 })
+      .toArray()
+    
+    // Create a Set for fast lookup
+    const alertSentContacts = new Set(
+      contactsWithAlerts.map(c => 
+        `${c.first_name.toLowerCase()}_${c.last_name.toLowerCase()}_${c.company.toLowerCase()}`
+      )
+    )
+    
+    // Get all overdue leads and filter
+    const allOverdueLeads = await db.collection("leads")
+      .find({ daysOverdue: { $gt: 0 } })
+      .toArray()
+    
+    const overdueLeads = allOverdueLeads.filter(lead => {
+      const nameParts = lead.fullName.split(" ")
+      const firstName = nameParts[0]?.toLowerCase() || ""
+      const lastName = nameParts.slice(1).join(" ").toLowerCase() || ""
+      const company = lead.company?.toLowerCase() || ""
+      const key = `${firstName}_${lastName}_${company}`
+      return !alertSentContacts.has(key)
+    }).length
+    
+    const [duplicates, unassignedLeads, missingFields, totalContacts] = await Promise.all([
       countDuplicates(db),
-      db.collection("contacts").countDocuments({ owner_id: null }),
+      db.collection("contacts").countDocuments(unassignedFilter),
       db.collection("contacts").countDocuments({ industry: null }),
       db.collection("contacts").countDocuments({}),
-      db.collection("leads").countDocuments({ daysOverdue: { $gt: 0 } }),
     ])
 
     if (totalContacts === 0) {

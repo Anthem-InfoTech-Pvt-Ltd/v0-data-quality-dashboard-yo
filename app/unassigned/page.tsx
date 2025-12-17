@@ -163,6 +163,9 @@ export default function UnassignedPage() {
         
         // Remove from selected records if it was selected
         setSelectedRecords(prev => prev.filter(id => id !== contactId))
+        
+        // Refresh data from API to ensure consistency
+        await fetchContacts(1, true)
       } else {
         throw new Error(result.error || "Failed to send email")
       }
@@ -223,6 +226,9 @@ export default function UnassignedPage() {
         
         // Clear selected records
         setSelectedRecords([])
+        
+        // Refresh data from API to ensure consistency
+        await fetchContacts(1, true)
       } else {
         throw new Error(result.error || result.message || "Failed to send emails")
       }

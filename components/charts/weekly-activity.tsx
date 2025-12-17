@@ -42,7 +42,7 @@ export function WeeklyActivityChart() {
     <Card>
       <CardHeader>
         <CardTitle>Weekly Activity</CardTitle>
-        <CardDescription>Issues detected vs resolved</CardDescription>
+        <CardDescription>Demo activity pattern - updates with real-time changes</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

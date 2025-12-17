@@ -18,6 +18,7 @@ export interface Contact {
   owner_id: string | null
   owner_name: string | null
   created_date: Date
+  email_alert_sent_at?: Date | null  // Track when email alert was sent
 }
 
 export interface Alert {

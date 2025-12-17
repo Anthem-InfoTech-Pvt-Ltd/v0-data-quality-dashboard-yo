@@ -73,6 +73,16 @@ export async function POST(request: Request) {
         })
 
         if (result.success) {
+          // Mark the contact as having an alert sent
+          await db.collection("contacts").updateOne(
+            { _id: contact._id },
+            { 
+              $set: { 
+                email_alert_sent_at: new Date() 
+              } 
+            }
+          )
+          
           results.push({
             contactId: contact._id,
             success: true,

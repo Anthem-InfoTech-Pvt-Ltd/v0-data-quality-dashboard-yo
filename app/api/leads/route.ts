@@ -92,6 +92,24 @@ export async function POST(request: Request) {
       })
 
       if (result.success) {
+        // Mark the associated contact as having an alert sent
+        const nameParts = lead.fullName.split(" ")
+        const firstName = nameParts[0]
+        const lastName = nameParts.slice(1).join(" ")
+
+        await db.collection("contacts").updateOne(
+          {
+            first_name: firstName,
+            last_name: lastName,
+            company: lead.company,
+          },
+          { 
+            $set: { 
+              email_alert_sent_at: new Date() 
+            } 
+          }
+        )
+
         return NextResponse.json({ 
           success: true, 
           message: `Email alert sent to ${toEmail}` 

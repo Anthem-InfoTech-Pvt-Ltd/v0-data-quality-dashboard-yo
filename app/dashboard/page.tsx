@@ -230,11 +230,25 @@ export default function DashboardPage() {
         // Remove the lead from the list immediately
         setOverdueLeads(prev => prev.filter(lead => lead._id !== leadId))
         
-        // Update metrics
-        setMetrics(prev => ({
-          ...prev,
-          overdueLeads: Math.max(0, prev.overdueLeads - 1)
-        }))
+        // Refresh all data from API to ensure consistency
+        try {
+          const [metricsRes, healthScoreRes, overdueLeadsRes] = await Promise.all([
+            fetch("/api/metrics"),
+            fetch("/api/health-score"),
+            fetch("/api/leads/overdue"),
+          ])
+          
+          const metricsData = await metricsRes.json()
+          const healthScoreData = await healthScoreRes.json()
+          const overdueLeadsData = await overdueLeadsRes.json()
+          
+          setMetrics(metricsData)
+          setHealthScore(healthScoreData.score)
+          setOverdueLeads(overdueLeadsData)
+        } catch (refreshError) {
+          console.error("Error refreshing data:", refreshError)
+          // Non-critical error, don't show toast
+        }
       } else {
         throw new Error(result.error || "Failed to send email")
       }

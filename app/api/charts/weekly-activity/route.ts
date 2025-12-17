@@ -24,9 +24,18 @@ export async function GET() {
       return NextResponse.json(days.map(day => ({ day, detected: 0, resolved: 0 })))
     }
     
+    // Filter for unassigned leads that haven't had email alerts sent
+    const unassignedFilter = { 
+      owner_id: null,
+      $or: [
+        { email_alert_sent_at: { $exists: false } },
+        { email_alert_sent_at: null }
+      ]
+    }
+    
     // Count unassigned and missing fields directly
     const [unassignedCount, missingFieldsCount] = await Promise.all([
-      db.collection("contacts").countDocuments({ owner_id: null }),
+      db.collection("contacts").countDocuments(unassignedFilter),
       db.collection("contacts").countDocuments({ industry: null })
     ])
     

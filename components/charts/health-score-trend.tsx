@@ -24,7 +24,7 @@ export function HealthScoreTrendChart() {
     <Card>
       <CardHeader>
         <CardTitle>Health Score Trend</CardTitle>
-        <CardDescription>Last 7 days performance</CardDescription>
+        <CardDescription>Simulated 7-day trend based on current data state</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

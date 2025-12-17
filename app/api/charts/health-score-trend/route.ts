@@ -22,12 +22,47 @@ export async function GET() {
       return NextResponse.json(healthScoreHistory)
     }
 
+    // Filter for unassigned leads that haven't had email alerts sent
+    const unassignedFilter = { 
+      owner_id: null,
+      $or: [
+        { email_alert_sent_at: { $exists: false } },
+        { email_alert_sent_at: null }
+      ]
+    }
+    
+    // Count overdue leads whose contacts haven't had alerts sent
+    const contactsWithAlerts = await db.collection("contacts")
+      .find({ 
+        email_alert_sent_at: { $exists: true, $ne: null } 
+      })
+      .project({ first_name: 1, last_name: 1, company: 1 })
+      .toArray()
+    
+    const alertSentContacts = new Set(
+      contactsWithAlerts.map(c => 
+        `${c.first_name.toLowerCase()}_${c.last_name.toLowerCase()}_${c.company.toLowerCase()}`
+      )
+    )
+    
+    const allOverdueLeads = await db.collection("leads")
+      .find({ daysOverdue: { $gt: 0 } })
+      .toArray()
+    
+    const overdueLeadsCount = allOverdueLeads.filter(lead => {
+      const nameParts = lead.fullName.split(" ")
+      const firstName = nameParts[0]?.toLowerCase() || ""
+      const lastName = nameParts.slice(1).join(" ").toLowerCase() || ""
+      const company = lead.company?.toLowerCase() || ""
+      const key = `${firstName}_${lastName}_${company}`
+      return !alertSentContacts.has(key)
+    }).length
+    
     // Count actual issues using the same logic as metrics API
     const [
       duplicateContacts,
       unassignedCount,
-      missingFieldsCount,
-      overdueLeadsCount
+      missingFieldsCount
     ] = await Promise.all([
       // Count duplicates more accurately
       db.collection("contacts").aggregate([
@@ -56,9 +91,8 @@ export async function GET() {
           $replaceRoot: { newRoot: "$docs" }
         }
       ]).toArray(),
-      db.collection("contacts").countDocuments({ owner_id: null }),
-      db.collection("contacts").countDocuments({ industry: null }),
-      db.collection("leads").countDocuments({ daysOverdue: { $gt: 0 } })
+      db.collection("contacts").countDocuments(unassignedFilter),
+      db.collection("contacts").countDocuments({ industry: null })
     ])
     
     const duplicates = duplicateContacts.length

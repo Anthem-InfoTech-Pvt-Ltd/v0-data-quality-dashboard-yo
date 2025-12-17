@@ -38,9 +38,13 @@ export async function GET(request: NextRequest) {
         return {
           ...lead,
           email: contact?.email || null,
+          email_alert_sent_at: contact?.email_alert_sent_at || null,
         }
       })
     )
+    
+    // Filter out leads where email alert has already been sent
+    const filteredLeads = enrichedLeads.filter(lead => !lead.email_alert_sent_at)
     
     const hasMore = skip + limit < totalCount
     
@@ -48,13 +52,17 @@ export async function GET(request: NextRequest) {
     const wantsPagination = searchParams.has('page') || searchParams.has('limit')
     
     if (wantsPagination) {
+      // Update totalCount to reflect filtered results
+      const filteredTotalCount = filteredLeads.length
+      const filteredHasMore = skip + limit < filteredTotalCount
+      
       return NextResponse.json({
-        data: enrichedLeads,
+        data: filteredLeads,
         page,
         limit,
-        totalCount,
-        hasMore,
-        totalPages: Math.ceil(totalCount / limit)
+        totalCount: filteredTotalCount,
+        hasMore: filteredHasMore,
+        totalPages: Math.ceil(filteredTotalCount / limit)
       })
     } else {
       // Return all leads for dashboard (backwards compatibility)
@@ -79,11 +87,15 @@ export async function GET(request: NextRequest) {
           return {
             ...lead,
             email: contact?.email || null,
+            email_alert_sent_at: contact?.email_alert_sent_at || null,
           }
         })
       )
       
-      return NextResponse.json(allEnrichedLeads)
+      // Filter out leads where email alert has already been sent
+      const filteredLeads = allEnrichedLeads.filter(lead => !lead.email_alert_sent_at)
+      
+      return NextResponse.json(filteredLeads)
     }
   } catch (error) {
     console.error("Error fetching overdue leads:", error)

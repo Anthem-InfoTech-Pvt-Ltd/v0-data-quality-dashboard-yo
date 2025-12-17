@@ -10,12 +10,21 @@ export async function GET(request: NextRequest) {
     
     const db = await getDatabase()
     
+    // Filter: unassigned contacts that haven't had email alerts sent
+    const filter = { 
+      owner_id: null,
+      $or: [
+        { email_alert_sent_at: { $exists: false } },
+        { email_alert_sent_at: null }
+      ]
+    }
+    
     // Get total count for pagination info
-    const totalCount = await db.collection("contacts").countDocuments({ owner_id: null })
+    const totalCount = await db.collection("contacts").countDocuments(filter)
     
     // Get paginated results
     const contacts = await db.collection("contacts")
-      .find({ owner_id: null })
+      .find(filter)
       .sort({ created_date: -1 }) // Most recent first
       .skip(skip)
       .limit(limit)
